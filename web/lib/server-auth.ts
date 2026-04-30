@@ -4,10 +4,9 @@ import { cookies } from 'next/headers'
 let jwks: ReturnType<typeof createRemoteJWKSet> | null = null
 
 function getJWKS() {
-  if (!jwks) {
-    const AUTH_URL = process.env.AUTH_SERVICE_URL ?? 'http://localhost:8086'
-    jwks = createRemoteJWKSet(new URL(`${AUTH_URL}/auth/jwks`))
-  }
+  // Evaluated at call time so Docker runtime env vars are used
+  const AUTH_URL = process.env.AUTH_SERVICE_URL ?? 'http://localhost:8086'
+  if (!jwks) jwks = createRemoteJWKSet(new URL(`${AUTH_URL}/auth/jwks`))
   return jwks
 }
 

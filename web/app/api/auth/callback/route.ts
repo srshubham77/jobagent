@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const AUTH_URL     = process.env.AUTH_SERVICE_URL ?? 'http://localhost:8086'
-const APP_URL      = process.env.NEXTAUTH_URL     ?? 'http://localhost:3000'
-const CALLBACK_URL = `${APP_URL}/api/auth/callback`
-
 export async function GET(req: NextRequest) {
+  const AUTH_URL     = process.env.AUTH_SERVICE_URL ?? 'http://localhost:8086'
+  const APP_URL      = process.env.NEXTAUTH_URL     ?? 'http://localhost:3000'
+  const CALLBACK_URL = `${APP_URL}/api/auth/callback`
+
   const { searchParams } = req.nextUrl
   const code  = searchParams.get('code')
   const state = searchParams.get('state')
@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
     })
 
     if (!res.ok) {
-      console.error('exchange failed:', res.status, await res.text())
+      console.error('[auth/callback] exchange failed:', res.status, await res.text())
       return NextResponse.redirect(`${APP_URL}/login?error=exchange_failed`)
     }
 
@@ -54,7 +54,7 @@ export async function GET(req: NextRequest) {
     response.cookies.delete('oauth_state')
     return response
   } catch (err) {
-    console.error('callback error:', err)
+    console.error('[auth/callback] error:', err)
     return NextResponse.redirect(`${APP_URL}/login?error=server_error`)
   }
 }

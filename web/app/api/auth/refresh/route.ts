@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const AUTH_URL = process.env.AUTH_SERVICE_URL ?? 'http://localhost:8086'
-const APP_URL  = process.env.NEXTAUTH_URL     ?? 'http://localhost:3000'
-
 export async function GET(req: NextRequest) {
+  const AUTH_URL = process.env.AUTH_SERVICE_URL ?? 'http://localhost:8086'
+  const APP_URL  = process.env.NEXTAUTH_URL     ?? 'http://localhost:3000'
+
   const callbackUrl  = req.nextUrl.searchParams.get('callbackUrl') ?? '/'
   const refreshToken = req.cookies.get('refresh_token')?.value
 

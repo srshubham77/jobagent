@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const AUTH_URL = process.env.AUTH_SERVICE_URL ?? 'http://localhost:8086'
-
 export async function POST(req: NextRequest) {
+  const AUTH_URL     = process.env.AUTH_SERVICE_URL ?? 'http://localhost:8086'
   const refreshToken = req.cookies.get('refresh_token')?.value
 
   if (refreshToken) {
