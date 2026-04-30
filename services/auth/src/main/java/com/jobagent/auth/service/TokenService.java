@@ -32,7 +32,7 @@ public class TokenService {
     void init() throws JOSEException {
         rsaKey = new RSAKeyGenerator(2048)
             .keyUse(KeyUse.SIGNATURE)
-            .keyIDFromThumbprint()
+            .keyIDFromThumbprint(true)
             .generate();
         signer = new RSASSASigner(rsaKey);
         publicKey = rsaKey.toRSAPublicKey();
