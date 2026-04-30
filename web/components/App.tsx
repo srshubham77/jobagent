@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useSession } from 'next-auth/react'
 import Sidebar from './Sidebar'
 import TopBar from './TopBar'
 import Dashboard from './Dashboard'
@@ -17,7 +16,6 @@ import { api, type FeedJob, type Profile, type Preferences } from '../lib/api'
 type Screen = 'dashboard' | 'jobs' | 'review' | 'pipeline' | 'analytics' | 'settings' | 'onboarding'
 
 export default function App() {
-  const { data: session } = useSession()
   const [active, setActive] = useState<Screen>('dashboard')
   const [openJob, setOpenJob] = useState<FeedJob | null>(null)
 
@@ -54,10 +52,10 @@ export default function App() {
     }
   }, [agentRunning])
 
-  const displayName = profile?.contact?.name ?? session?.user?.name ?? 'You'
+  const displayName = profile?.contact?.name ?? 'You'
   const user = {
     name: displayName,
-    email: profile?.contact?.email ?? session?.user?.email ?? '',
+    email: profile?.contact?.email ?? '',
     avatarMonogram: displayName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase(),
   }
 

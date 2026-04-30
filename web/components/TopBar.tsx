@@ -1,7 +1,11 @@
 'use client'
 
-import { signOut } from 'next-auth/react'
 import { Avatar, KillSwitch } from './Atoms'
+
+async function handleSignOut() {
+  await fetch('/api/auth/logout', { method: 'POST' })
+  window.location.href = '/login'
+}
 
 const TITLES: Record<string, string> = {
   dashboard:  'Dashboard',
@@ -25,7 +29,7 @@ export default function TopBar({ active, agentRunning, onToggleAgent, user }: {
         <KillSwitch running={agentRunning} onToggle={onToggleAgent} />
         <Avatar>{user.avatarMonogram}</Avatar>
         <button
-          onClick={() => signOut({ callbackUrl: '/login' })}
+          onClick={handleSignOut}
           style={{
             fontSize: 12,
             color: 'var(--fg-muted)',

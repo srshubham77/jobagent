@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth/next'
-import { authOptions } from '@/auth'
+import { getUserId } from '@/lib/server-auth'
 
 const PROFILE_URL = process.env.PROFILE_SERVICE_URL ?? 'http://localhost:8081'
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const userId = session.user.id
+  const userId = await getUserId()
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   try {
     // Forward the multipart form data directly to the profile service
@@ -17,8 +15,7 @@ export async function POST(req: NextRequest) {
       headers: { 'X-User-Id': userId },
       body: formData,
     })
-    const data = await res.json()
-    return NextResponse.json(data, { status: res.status })
+    return NextResponse.json(await res.json(), { status: res.status })
   } catch {
     return NextResponse.json({ error: 'Profile service unavailable' }, { status: 503 })
   }

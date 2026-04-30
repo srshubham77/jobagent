@@ -1,0 +1,26 @@
+spring:
+  application:
+    name: auth-service
+  data:
+    redis:
+      url: ${REDIS_URL:redis://localhost:6379}
+
+server:
+  port: 8086
+
+auth:
+  google:
+    client-id: ${GOOGLE_CLIENT_ID}
+    client-secret: ${GOOGLE_CLIENT_SECRET}
+  jwt:
+    access-token-ttl-seconds: 900
+    refresh-token-ttl-seconds: 2592000
+
+profile-service-url: ${PROFILE_SERVICE_URL:http://localhost:8081}
+web-app-url: ${WEB_APP_URL:http://localhost:3000}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth/next'
-import { authOptions } from '@/auth'
+import { getUserId } from '@/lib/server-auth'
 
 const PROFILE_URL = process.env.PROFILE_SERVICE_URL ?? 'http://localhost:8081'
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const userId = session.user.id
+  const userId = await getUserId()
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   try {
     const body = await req.json()
@@ -16,17 +14,15 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       headers: { 'X-User-Id': userId, 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     })
-    const data = await res.json()
-    return NextResponse.json(data, { status: res.status })
+    return NextResponse.json(await res.json(), { status: res.status })
   } catch {
     return NextResponse.json({ error: 'Profile service unavailable' }, { status: 503 })
   }
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const userId = session.user.id
+  const userId = await getUserId()
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   try {
     const res = await fetch(`${PROFILE_URL}/stories/${params.id}`, {

@@ -1,6 +1,5 @@
 'use client'
 
-import { signIn } from 'next-auth/react'
 import { useState } from 'react'
 
 export default function LoginClient() {
@@ -8,7 +7,7 @@ export default function LoginClient() {
 
   const handleSignIn = () => {
     setLoading(true)
-    signIn('google', { callbackUrl: '/' })
+    window.location.href = '/api/auth/login'
   }
 
   return (

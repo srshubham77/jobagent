@@ -1,0 +1,28 @@
+package com.jobagent.auth.config;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.servlet.config.annotation.CorsRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+
+@Configuration
+public class WebConfig implements WebMvcConfigurer {
+    @Value("${web-app-url:http://localhost:3000}")
+    private String webAppUrl;
+
+    @Override
+    public void addCorsMappings(CorsRegistry registry) {
+        registry.addMapping("/auth/**")
+            .allowedOrigins(webAppUrl)
+            .allowedMethods("GET", "POST", "DELETE")
+            .allowCredentials(true)
+            .maxAge(3600);
+    }
+
+    @Bean
+    public RestClient restClient() {
+        return RestClient.create();
+    }
+}
