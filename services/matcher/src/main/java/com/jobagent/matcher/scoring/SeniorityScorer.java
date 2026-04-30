@@ -81,15 +81,26 @@ public class SeniorityScorer {
     }
 
     private Result scoreGap(int candidate, int jd) {
-        int gap = Math.abs(candidate - jd);
-        int score = switch (gap) {
-            case 0  -> 100;
-            case 1  -> 75;
-            case 2  -> 50;
-            default -> 20;
-        };
+        int gap = candidate - jd; // positive = overleveled, negative = underleveled
+        int score;
+        if (gap <= 0) {
+            // Underleveled: candidate is below JD requirement — penalize
+            score = switch (-gap) {
+                case 0  -> 100;
+                case 1  -> 75;
+                case 2  -> 50;
+                default -> 20;
+            };
+        } else {
+            // Overleveled: senior applying to SE/Backend role is normal — minimal penalty
+            score = switch (gap) {
+                case 1  -> 100;
+                case 2  -> 85;
+                default -> 70;
+            };
+        }
         String gapNote = gap == 0 ? null
-                : candidate < jd ? "underleveled by " + gap
+                : gap < 0 ? "underleveled by " + (-gap)
                 : "overleveled by " + gap;
         return new Result(score, gapNote);
     }

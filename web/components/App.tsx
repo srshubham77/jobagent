@@ -11,53 +11,65 @@ import Analytics from './Analytics'
 import Settings from './Settings'
 import Onboarding from './Onboarding'
 import ReviewQueue from './ReviewQueue'
-import { DATA } from './data'
-import { api } from '../lib/api'
-import type { Job } from './types'
+import { api, type FeedJob, type Profile, type Preferences } from '../lib/api'
 
 type Screen = 'dashboard' | 'jobs' | 'review' | 'pipeline' | 'analytics' | 'settings' | 'onboarding'
 
 export default function App() {
   const [active, setActive] = useState<Screen>('dashboard')
-  const [agentRunning, setRunning] = useState(true)
-  const [openJob, setOpenJob] = useState<Job | null>(null)
-  const [prefLoaded, setPrefLoaded] = useState(false)
+  const [openJob, setOpenJob] = useState<FeedJob | null>(null)
 
-  // Load agent_enabled from real preferences API on mount
+  const [jobs, setJobs] = useState<FeedJob[]>([])
+  const [profile, setProfile] = useState<Profile | null>(null)
+  const [prefs, setPrefs] = useState<Preferences | null>(null)
+  const [agentRunning, setAgentRunning] = useState(true)
+  const [loading, setLoading] = useState(true)
+
   useEffect(() => {
-    api.getPreferences()
-      .then(prefs => {
-        setRunning(prefs.agentEnabled)
-        setPrefLoaded(true)
-      })
-      .catch(() => setPrefLoaded(true)) // fall back to default=true if service is down
+    Promise.all([
+      api.getJobs().catch(() => [] as FeedJob[]),
+      api.getProfile().catch(() => null),
+      api.getPreferences().catch(() => null),
+    ]).then(([fetchedJobs, fetchedProfile, fetchedPrefs]) => {
+      setJobs(fetchedJobs)
+      setProfile(fetchedProfile)
+      if (fetchedPrefs) {
+        setPrefs(fetchedPrefs)
+        setAgentRunning(fetchedPrefs.agentEnabled)
+      }
+      setLoading(false)
+    })
   }, [])
 
   const handleToggleAgent = useCallback(async () => {
     const next = !agentRunning
-    setRunning(next)
+    setAgentRunning(next)
     try {
       await api.setPreferences({ agentEnabled: next })
+      setPrefs(p => p ? { ...p, agentEnabled: next } : p)
     } catch {
-      // Roll back optimistic update if the API call fails
-      setRunning(!next)
+      setAgentRunning(!next)
     }
   }, [agentRunning])
 
+  const user = {
+    name: profile?.contact?.name ?? 'You',
+    email: profile?.contact?.email ?? '',
+    avatarMonogram: (profile?.contact?.name ?? 'U').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase(),
+  }
+
   const screen = (() => {
     switch (active) {
-      case 'dashboard':  return <Dashboard data={DATA} agentRunning={agentRunning} />
-      case 'jobs':       return <JobsFeed data={DATA} onOpen={setOpenJob} />
+      case 'dashboard':  return <Dashboard jobs={jobs} agentRunning={agentRunning} userName={user.name} loading={loading} />
+      case 'jobs':       return <JobsFeed jobs={jobs} loading={loading} onOpen={setOpenJob} />
       case 'review':     return <ReviewQueue />
-      case 'pipeline':   return <Kanban data={DATA} />
-      case 'analytics':  return <Analytics data={DATA} />
-      case 'settings':   return <Settings data={DATA} agentRunning={agentRunning} onToggleAgent={handleToggleAgent} />
+      case 'pipeline':   return <Kanban />
+      case 'analytics':  return <Analytics />
+      case 'settings':   return <Settings prefs={prefs} agentRunning={agentRunning} onToggleAgent={handleToggleAgent} />
       case 'onboarding': return <Onboarding onDone={() => setActive('dashboard')} />
       default:           return null
     }
   })()
-
-  const isSubmitted = openJob ? ['applied', 'active', 'closed'].includes(openJob.status) : false
 
   return (
     <div className="demo-shell">
@@ -68,7 +80,7 @@ export default function App() {
             active={active}
             agentRunning={agentRunning}
             onToggleAgent={handleToggleAgent}
-            user={DATA.user}
+            user={user}
           />
           {screen}
         </main>
@@ -77,10 +89,7 @@ export default function App() {
       {openJob && (
         <JobDetailDrawer
           job={openJob}
-          data={DATA}
           onClose={() => setOpenJob(null)}
-          defaultTab="draft"
-          submitted={isSubmitted}
         />
       )}
     </div>

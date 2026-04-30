@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Button, Icon, Input, KillSwitch, Toggle } from './Atoms'
-import type { AppData } from './types'
+import type { Preferences } from '../lib/api'
 
 const SETTINGS_NAV = [
   { id: 'profile',    label: 'Profile' },
@@ -305,8 +305,8 @@ const AccountSection = () => (
   </div>
 )
 
-export default function Settings({ data, agentRunning, onToggleAgent }: {
-  data: AppData; agentRunning: boolean; onToggleAgent: () => void
+export default function Settings({ prefs: _prefs, agentRunning, onToggleAgent }: {
+  prefs: Preferences | null; agentRunning: boolean; onToggleAgent: () => void
 }) {
   const [section, setSection] = useState('automation')
 

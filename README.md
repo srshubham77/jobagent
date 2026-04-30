@@ -4,7 +4,7 @@
 
 **An AI agent that finds remote, USD-paying engineering jobs and applies on your behalf.**
 
-[![Status](https://img.shields.io/badge/status-Phase%201%20complete-brightgreen)]()
+[![Status](https://img.shields.io/badge/status-Phase%202%20in%20progress-blue)]()
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Stack](https://img.shields.io/badge/stack-Java%20%7C%20Python%20%7C%20Next.js-informational)]()
 
@@ -126,24 +126,41 @@ The app is at **http://localhost:3000**. Flyway migrations run automatically on 
 ### Bootstrap a user (Phase 1 — no auth yet)
 
 ```bash
-# Create the dev user (or get its ID if already exists)
+# 1. Create the dev user (returns userId — save this)
 curl -s -X POST http://localhost:8081/users/bootstrap \
   -H "Content-Type: application/json" \
   -d '{"email":"you@example.com"}' | jq .
 
-# Upload a resume
-curl -s -X POST http://localhost:8081/profiles/upload \
+# 2. Upload your resume (PDF or DOCX)
+curl -s -X POST "http://localhost:8081/profiles/me/resume" \
   -H "X-User-Id: <userId-from-above>" \
   -F "file=@/path/to/resume.pdf" | jq .
+
+# 3. (Optional) Set preferences — min salary, target roles, etc.
+curl -s -X PUT http://localhost:8081/profiles/me/preferences \
+  -H "X-User-Id: <userId-from-above>" \
+  -H "Content-Type: application/json" \
+  -d '{"minSalaryUsd":80000,"targetRoles":["Software Engineer","Backend Engineer"]}' | jq .
+
+# 4. Set DEV_USER_ID in .env to the userId from step 1
+#    (the web UI uses this to identify the current user until auth is added)
 ```
 
-Then open the UI, go to **Settings → Automation**, and turn on the agent. The discovery crawlers run on their configured schedule (every 6 hours for RemoteOK and WWR, once daily for HN).
+The discovery crawlers run on their configured schedule (every 6 hours for RemoteOK and WWR, once daily for HN). Trigger them immediately with the commands below.
 
 ### Manual trigger
 
 ```bash
-# Trigger a crawl run immediately
+# Trigger a crawl run immediately (discovery → matcher runs automatically after)
 curl -X POST http://localhost:8082/crawl
+
+# Or run the matcher manually against all discovered jobs
+curl -s -X POST http://localhost:8083/match/run \
+  -H "X-User-Id: <userId>" | jq .
+
+# View the scored job feed
+curl -s "http://localhost:8083/match/feed" \
+  -H "X-User-Id: <userId>" | jq '.[0:3]'
 ```
 
 ### Development (without Docker)
@@ -184,6 +201,7 @@ All configuration lives in `.env`. See `.env.example` for the full list.
 | `ANTHROPIC_API_KEY` | Draft generation, salary normalization |
 | `DATABASE_URL` | Postgres connection string |
 | `DATABASE_USER` / `DATABASE_PASSWORD` | DB credentials |
+| `DEV_USER_ID` | UUID of the dev user (returned by `/users/bootstrap`) — used by the web UI until auth is added |
 
 **Optional — later phases:**
 
@@ -202,38 +220,44 @@ All configuration lives in `.env`. See `.env.example` for the full list.
 
 ## Roadmap
 
-### ✅ Phase 1 — MVP (complete)
+### ✅ Phase 1 — Core pipeline (done)
 
 - Profile service: resume upload and parsing (Apache Tika + Claude), structured profile CRUD, version history, story bank with STAR format and themes
 - Discovery service: RemoteOK, We Work Remotely (RSS), and HN "Who's Hiring" (Algolia API) crawlers; per-source circuit breaker
 - Salary normalization pipeline: regex classification (`usd_explicit` / `usd_implied` / `unstated` / `non_usd`), Claude Haiku fallback for ambiguous cases
-- Matcher service: 4-dimension fit scoring (skill overlap 35%, seniority 25%, salary fit 25%, recency 15%); score stored with full breakdown
-- Apply service: cover letter + Q&A generation using story bank, resume tailoring (keywords only, no fabrication), Tier 1 (Greenhouse/Lever API), Tier 2 (Playwright), Tier 3 (manual)
-- Kill switch: `agent_enabled` toggle persisted in DB, checked on every submit call, wired to Settings UI
-- Frontend: Next.js 14 dashboard with kill switch connected to real API
-- Infrastructure: multi-stage Docker builds for all services, full Docker Compose stack
+- Matcher service: 4-dimension fit scoring (skill overlap 35%, seniority 25%, salary fit 25%, recency 15%); asymmetric seniority penalty (being slightly overleveled is OK); score stored with full breakdown
+- Apply service skeleton: cover letter + Q&A generation and resume tailoring endpoints (Playwright submission pending)
+- Frontend: Next.js 14 app wired to real APIs — live job feed, fit breakdown, salary normalization display, filterable jobs list
+- Infrastructure: multi-stage Docker builds, full Docker Compose stack, Flyway migrations
 
-**Success criteria:** drafted applications for 20 real jobs end-to-end without breaking; fit scores feel right after calibration.
+**Known gaps heading into Phase 2:**
+- Apply service Playwright submission not yet end-to-end tested
+- Review queue "Approve and draft" not wired to Apply service
+- Non-engineering roles (PM, Designer) slip through — discovery title filter pending
+- Kill switch UI toggle not yet persisted to DB
 
-### Phase 2 — Tracking + Tier 1 auto-submit
+### 🚧 Phase 2 — Tracking + approval queue (in progress)
 
-- Email crawler with Gmail OAuth → `Active` and `Closed` state transitions
-- Tier 1 auto-submit via Greenhouse and Lever ATS APIs
+- ✅ Tracker service scaffolded (email ingestion, classification, state machine)
+- ✅ Gmail OAuth flow implemented
+- Gmail email ingestion → `Active` and `Closed` state transitions (pending end-to-end test)
+- Application approval queue: approve/reject drafts from the UI
 - Duplicate application guard
-- Application approval queue with one-click approve/reject
+- Tier 1 auto-submit via Greenhouse and Lever ATS APIs
 
-### Phase 3 — Network + learning
+### Phase 3 — Network + referrals
 
 - LinkedIn manual export ingestion
-- Referral path detection and surfacing
+- Connection lookup by company, surfaced in job detail drawer
+- Referral path detection and draft referral message generation
 - Learning loop: embed user edits, retrieve at draft time (pgvector)
-- Recruiter contact enrichment
 
 ### Phase 4 — Analytics + polish
 
 - Funnel view with breakdowns by source and resume variant
+- Reply rate tracking
 - Notifications: new high-fit discoveries, recruiter replies
-- Pipeline kanban in sync with live application state
+- Pipeline kanban synced with live application state
 
 ## Project structure
 

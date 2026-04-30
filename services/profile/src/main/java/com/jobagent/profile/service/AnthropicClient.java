@@ -71,7 +71,9 @@ public class AnthropicClient {
 
         try (var response = http.newCall(request).execute()) {
             if (!response.isSuccessful()) {
-                throw new IOException("Anthropic API error: " + response.code() + " " + response.message());
+                String errBody = response.body() != null ? response.body().string() : "(no body)";
+                log.error("Anthropic API error: {} {}", response.code(), errBody);
+                throw new IOException("Anthropic API error: " + response.code() + " " + errBody);
             }
             var responseBody = response.body().string();
             log.debug("Anthropic raw response length={}", responseBody.length());

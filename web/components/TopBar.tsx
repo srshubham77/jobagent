@@ -1,7 +1,6 @@
 'use client'
 
 import { Avatar, KillSwitch } from './Atoms'
-import type { User } from './types'
 
 const TITLES: Record<string, string> = {
   dashboard:  'Dashboard',
@@ -16,7 +15,7 @@ export default function TopBar({ active, agentRunning, onToggleAgent, user }: {
   active: string
   agentRunning: boolean
   onToggleAgent: () => void
-  user: User
+  user: { name: string; email: string; avatarMonogram: string }
 }) {
   return (
     <header className="topbar">

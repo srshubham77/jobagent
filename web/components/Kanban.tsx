@@ -2,7 +2,13 @@
 
 import { useState } from 'react'
 import { Button, ClosedSubTagPill, FitScore, Icon, LogoChip, SalaryBadge } from './Atoms'
-import type { AppData, ClosedTag, Job, PipelineStatus, SalaryMode } from './types'
+import type { ClosedTag, PipelineStatus, SalaryMode } from './types'
+
+interface KanbanJob {
+  id: string; title: string; company: string; status: PipelineStatus
+  closedTag?: ClosedTag; salaryMode: SalaryMode; salaryRange: string
+  fit: number; tier: number; logoChar: string; logoBg: string
+}
 
 const COL_LABELS: Record<PipelineStatus, string> = {
   discovered: 'Discovered',
@@ -18,8 +24,8 @@ const SALARY_LABEL: Record<SalaryMode, string> = { explicit: 'USD explicit', imp
 
 interface PendingMove { jobId: string; fromIdx: number; toIdx: number; jobTitle: string; fromLabel: string; toLabel: string }
 
-export default function Kanban({ data }: { data: AppData }) {
-  const [jobs, setJobs] = useState<Job[]>(data.jobs)
+export default function Kanban() {
+  const [jobs, setJobs] = useState<KanbanJob[]>([])
   const [closedFilter, setClosedFilter] = useState<'all' | ClosedTag>('all')
   const [pendingMove, setPendingMove] = useState<PendingMove | null>(null)
 
@@ -36,7 +42,7 @@ export default function Kanban({ data }: { data: AppData }) {
     }))
   }
 
-  const tryMove = (job: Job, dir: number) => {
+  const tryMove = (job: KanbanJob, dir: number) => {
     const fromIdx = COLS.indexOf(job.status)
     const toIdx = Math.max(0, Math.min(COLS.length - 1, fromIdx + dir))
     if (toIdx < fromIdx) {
@@ -92,7 +98,7 @@ export default function Kanban({ data }: { data: AppData }) {
                   <div className="km">{j.company}</div>
                   <div className="kr">
                     <SalaryBadge mode={j.salaryMode} label={SALARY_LABEL[j.salaryMode]} />
-                    <span className="km">{j.postedAgo}</span>
+                    <span className="km">{j.company}</span>
                   </div>
                   {col === 'closed' && j.closedTag && (
                     <div className="closed-tag"><ClosedSubTagPill tag={j.closedTag} /></div>

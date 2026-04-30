@@ -4,6 +4,7 @@ import com.jobagent.matcher.domain.JobFitScore;
 import com.jobagent.matcher.repository.JobFitScoreRepository;
 import com.jobagent.matcher.repository.ProfileRepository;
 import com.jobagent.matcher.service.MatcherService;
+import com.jobagent.matcher.web.dto.JobFeedItem;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -44,12 +45,24 @@ public class MatcherController {
         return ResponseEntity.ok(matcherService.scoreJob(userId, jobId));
     }
 
-    /** Return all fit scores for the user's current profile, sorted best-first. */
+    /** Return enriched job+score feed, sorted best-first. */
+    @GetMapping("/feed")
+    public ResponseEntity<List<JobFeedItem>> feed(
+            @RequestHeader("X-User-Id") UUID userId) {
+        return ResponseEntity.ok(matcherService.getFeed(userId));
+    }
+
+    /** Return fit scores for the user's current profile, sorted best-first. Optional minScore filter. */
     @GetMapping("/scores")
     public ResponseEntity<List<JobFitScore>> scores(
-            @RequestHeader("X-User-Id") UUID userId) {
+            @RequestHeader("X-User-Id") UUID userId,
+            @RequestParam(defaultValue = "0") int minScore) {
         var profile = profileRepository.findByUserIdAndIsCurrentTrue(userId)
                 .orElseThrow(() -> new NoSuchElementException("No profile for user " + userId));
-        return ResponseEntity.ok(fitScoreRepository.findByProfileIdOrderByScoreDesc(profile.getId()));
+        var scores = fitScoreRepository.findByProfileIdOrderByScoreDesc(profile.getId());
+        if (minScore > 0) {
+            scores = scores.stream().filter(s -> s.getScore() >= minScore).toList();
+        }
+        return ResponseEntity.ok(scores);
     }
 }

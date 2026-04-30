@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 const PROFILE_URL = process.env.PROFILE_SERVICE_URL ?? 'http://localhost:8081'
-const DEV_USER_ID = process.env.DEV_USER_ID ?? '00000000-0000-0000-0000-000000000001'
+const DEV_USER_ID = process.env.DEV_USER_ID ?? 'f4309bb2-433d-4465-bfba-5cd1472e49d7'
 
 export async function GET() {
   try {

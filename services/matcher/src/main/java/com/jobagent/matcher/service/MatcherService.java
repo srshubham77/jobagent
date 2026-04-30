@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jobagent.matcher.config.MatcherProperties;
 import com.jobagent.matcher.domain.*;
 import com.jobagent.matcher.repository.*;
+import com.jobagent.matcher.web.dto.JobFeedItem;
 import com.jobagent.matcher.scoring.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -102,9 +103,9 @@ public class MatcherService {
     }
 
     private JobFitScore computeScore(Job job, Profile profile, Integer minSalary) {
-        // Extract job tags from source if available (for RemoteOK the tags are stored in jd_body header;
-        // for now derive from title words as a proxy — real tags would come from a dedicated column)
-        List<String> jdTags = extractTagsFromTitle(job.getTitle());
+        // No structured tag column yet — pass empty so SkillOverlapScorer uses the body-based path.
+        // Title-derived pseudo-tags caused false negatives (role nouns treated as required tech skills).
+        List<String> jdTags = List.of();
 
         // Run scorers
         var skillResult = skillScorer.score(profile.getSkills(), jdTags, job.getJdBody());
@@ -153,6 +154,38 @@ public class MatcherService {
         score.setSalaryFit(salaryResult.score());
         score.setBreakdown(breakdown);
         return score;
+    }
+
+    public List<JobFeedItem> getFeed(UUID userId) {
+        Profile profile = profileRepository.findByUserIdAndIsCurrentTrue(userId)
+                .orElseThrow(() -> new NoSuchElementException("No current profile for user " + userId));
+
+        return fitScoreRepository.findByProfileIdOrderByScoreDesc(profile.getId()).stream()
+                .map(score -> jobRepository.findById(score.getJobId())
+                        .map(job -> new JobFeedItem(
+                                score.getId(),
+                                job.getId(),
+                                job.getTitle(),
+                                job.getCompany(),
+                                job.getLocation(),
+                                job.isRemote(),
+                                job.getSource(),
+                                job.getSalaryMode(),
+                                job.getSalaryMinUsd(),
+                                job.getSalaryMaxUsd(),
+                                job.getSalaryRaw(),
+                                job.getApplyUrl(),
+                                job.getTier(),
+                                job.getPostedAt(),
+                                score.getScore(),
+                                score.getSkillOverlap(),
+                                score.getSeniorityMatch(),
+                                score.getSalaryFit(),
+                                score.getBreakdown()
+                        ))
+                        .orElse(null))
+                .filter(Objects::nonNull)
+                .toList();
     }
 
     private List<String> extractTagsFromTitle(String title) {

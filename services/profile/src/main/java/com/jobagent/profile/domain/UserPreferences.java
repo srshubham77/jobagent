@@ -8,6 +8,7 @@ import lombok.Setter;
 import org.hibernate.annotations.Type;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -60,6 +61,7 @@ public class UserPreferences {
     public static UserPreferences defaults(UUID userId) {
         var p = new UserPreferences();
         p.setUserId(userId);
+        p.setTargetStack(new ArrayList<>());
         return p;
     }
 }

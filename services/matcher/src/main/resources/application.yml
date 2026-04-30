@@ -38,7 +38,7 @@ anthropic:
 
 matcher:
   # Score jobs in batches this large each run
-  batch-size: 50
+  batch-size: 500
   # Fixed delay between scoring passes (ms)
   scoring-delay-ms: 60000
   # Weights must sum to 1.0
