@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(_req: NextRequest) {
-  const AUTH_URL     = process.env.AUTH_SERVICE_URL ?? 'http://localhost:8086'
-  const APP_URL      = process.env.NEXTAUTH_URL     ?? 'http://localhost:3000'
+  const AUTH_URL     = process.env['AUTH_SERVICE_URL'] ?? 'http://localhost:8086'
+  const APP_URL      = process.env['NEXTAUTH_URL']     ?? 'http://localhost:3000'
   const CALLBACK_URL = `${APP_URL}/api/auth/callback`
 
   try {

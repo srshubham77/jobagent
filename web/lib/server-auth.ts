@@ -5,7 +5,7 @@ let jwks: ReturnType<typeof createRemoteJWKSet> | null = null
 
 function getJWKS() {
   // Evaluated at call time so Docker runtime env vars are used
-  const AUTH_URL = process.env.AUTH_SERVICE_URL ?? 'http://localhost:8086'
+  const AUTH_URL = process.env['AUTH_SERVICE_URL'] ?? 'http://localhost:8086'
   if (!jwks) jwks = createRemoteJWKSet(new URL(`${AUTH_URL}/auth/jwks`))
   return jwks
 }
