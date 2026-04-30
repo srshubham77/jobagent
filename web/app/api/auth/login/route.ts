@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const AUTH_URL = process.env.AUTH_SERVICE_URL ?? 'http://localhost:8086'
-const APP_URL  = process.env.NEXTAUTH_URL ?? 'http://localhost:3000'
-
+const AUTH_URL    = process.env.AUTH_SERVICE_URL ?? 'http://localhost:8086'
+const APP_URL     = process.env.NEXTAUTH_URL     ?? 'http://localhost:3000'
 const CALLBACK_URL = `${APP_URL}/api/auth/callback`
 
 export async function GET(req: NextRequest) {
@@ -19,6 +18,6 @@ export async function GET(req: NextRequest) {
     })
     return response
   } catch {
-    return NextResponse.redirect(new URL('/login?error=auth_unavailable', req.url))
+    return NextResponse.redirect(`${APP_URL}/login?error=auth_unavailable`)
   }
 }

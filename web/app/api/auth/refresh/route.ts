@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 const AUTH_URL = process.env.AUTH_SERVICE_URL ?? 'http://localhost:8086'
+const APP_URL  = process.env.NEXTAUTH_URL     ?? 'http://localhost:3000'
 
 export async function GET(req: NextRequest) {
-  const callbackUrl = req.nextUrl.searchParams.get('callbackUrl') ?? '/'
+  const callbackUrl  = req.nextUrl.searchParams.get('callbackUrl') ?? '/'
   const refreshToken = req.cookies.get('refresh_token')?.value
 
   if (!refreshToken) {
-    return NextResponse.redirect(new URL('/login', req.url))
+    return NextResponse.redirect(`${APP_URL}/login`)
   }
 
   try {
@@ -18,7 +19,7 @@ export async function GET(req: NextRequest) {
     })
 
     if (!res.ok) {
-      const response = NextResponse.redirect(new URL('/login', req.url))
+      const response = NextResponse.redirect(`${APP_URL}/login`)
       response.cookies.delete('access_token')
       response.cookies.delete('refresh_token')
       return response
@@ -30,7 +31,8 @@ export async function GET(req: NextRequest) {
       expiresIn: number
     }
 
-    const response = NextResponse.redirect(new URL(callbackUrl, req.url))
+    const safeCallbackUrl = callbackUrl.startsWith('/') ? callbackUrl : '/'
+    const response = NextResponse.redirect(`${APP_URL}${safeCallbackUrl}`)
     response.cookies.set('access_token', accessToken, {
       httpOnly: true,
       secure:   process.env.NODE_ENV === 'production',
@@ -47,6 +49,6 @@ export async function GET(req: NextRequest) {
     })
     return response
   } catch {
-    return NextResponse.redirect(new URL('/login', req.url))
+    return NextResponse.redirect(`${APP_URL}/login`)
   }
 }

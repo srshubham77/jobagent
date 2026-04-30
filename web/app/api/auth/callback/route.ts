@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const AUTH_URL = process.env.AUTH_SERVICE_URL ?? 'http://localhost:8086'
-const APP_URL  = process.env.NEXTAUTH_URL ?? 'http://localhost:3000'
-
+const AUTH_URL     = process.env.AUTH_SERVICE_URL ?? 'http://localhost:8086'
+const APP_URL      = process.env.NEXTAUTH_URL     ?? 'http://localhost:3000'
 const CALLBACK_URL = `${APP_URL}/api/auth/callback`
 
 export async function GET(req: NextRequest) {
@@ -11,12 +10,12 @@ export async function GET(req: NextRequest) {
   const state = searchParams.get('state')
 
   if (!code || !state) {
-    return NextResponse.redirect(new URL('/login?error=missing_params', req.url))
+    return NextResponse.redirect(`${APP_URL}/login?error=missing_params`)
   }
 
   const storedState = req.cookies.get('oauth_state')?.value
   if (!storedState || storedState !== state) {
-    return NextResponse.redirect(new URL('/login?error=state_mismatch', req.url))
+    return NextResponse.redirect(`${APP_URL}/login?error=state_mismatch`)
   }
 
   try {
@@ -27,7 +26,8 @@ export async function GET(req: NextRequest) {
     })
 
     if (!res.ok) {
-      return NextResponse.redirect(new URL('/login?error=exchange_failed', req.url))
+      console.error('exchange failed:', res.status, await res.text())
+      return NextResponse.redirect(`${APP_URL}/login?error=exchange_failed`)
     }
 
     const { accessToken, refreshToken, expiresIn } = await res.json() as {
@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
       expiresIn: number
     }
 
-    const response = NextResponse.redirect(new URL('/', req.url))
+    const response = NextResponse.redirect(`${APP_URL}/`)
     response.cookies.set('access_token', accessToken, {
       httpOnly: true,
       secure:   process.env.NODE_ENV === 'production',
@@ -53,7 +53,8 @@ export async function GET(req: NextRequest) {
     })
     response.cookies.delete('oauth_state')
     return response
-  } catch {
-    return NextResponse.redirect(new URL('/login?error=server_error', req.url))
+  } catch (err) {
+    console.error('callback error:', err)
+    return NextResponse.redirect(`${APP_URL}/login?error=server_error`)
   }
 }
