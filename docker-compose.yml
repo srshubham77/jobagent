@@ -154,7 +154,10 @@ services:
       MATCHER_SERVICE_URL: http://matcher:8083
       APPLY_SERVICE_URL: http://apply:8084
       TRACKER_SERVICE_URL: http://tracker:8085
-      DEV_USER_ID: f4309bb2-433d-4465-bfba-5cd1472e49d7
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
     depends_on:
       profile:
         condition: service_healthy

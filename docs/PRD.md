@@ -1,9 +1,9 @@
 # PRD: AI Job Application Agent
 
-> **Status:** Draft v2.0
+> **Status:** Draft v2.1
 > **Author:** Shubham
-> **Last updated:** April 26, 2026
-> **Repo:** TBD
+> **Last updated:** May 01, 2026
+> **Repo:** https://github.com/srshubham77/jobagent
 
 ---
 
@@ -235,7 +235,31 @@ The user needs to see if the product is actually working.
 - **Actionable surface:** "RemoteOK has a 0.5% reply rate over the last 30 days — consider deprioritizing." "Resume variant A converts at 2x variant B for backend roles."
 - This is also the differentiator vs. existing tools like Huntr.
 
-### 6.16 Kill Switch
+### 6.17 Authentication
+
+JobAgent uses Google OAuth as the sole identity provider. There are no passwords.
+
+**Sign-in / sign-up flow:**
+1. User visits any page → middleware redirects to `/login` if no session.
+2. User clicks "Sign in with Google" → Google OAuth consent screen.
+3. On first sign-in: profile service `POST /users/bootstrap` creates the user record; on subsequent sign-ins it returns the existing UUID.
+4. Our internal UUID is stored in the JWT cookie; all backend service calls pass it as the `X-User-Id` header.
+5. Session is a signed JWT cookie managed by NextAuth.js. No server-side session table needed.
+
+**Session lifetime:** 30 days rolling. Re-authentication required on browser data clear.
+
+**What is and isn't stored in the JWT:**
+- Stored: our internal user UUID (`userId`), display name, email, Google profile picture URL.
+- Not stored: access tokens, refresh tokens, profile data, preferences.
+
+**Multi-device / shared browser:** sessions are per-browser (JWT in HTTP-only cookie). No explicit multi-session management in v1.
+
+**Future auth requirements:**
+- Email/password login is explicitly out of scope — Google OAuth is the only supported method.
+- LinkedIn OAuth will be added in Phase 3 as a *separate integration* (email tracking, not identity).
+- Gmail OAuth (for email tracking) is an integration, not the identity provider.
+
+### 6.19 Kill Switch
 
 - Global one-click "halt all automation."
 - Stops: crawlers, draft generation, auto-submit, email classifier writes.
@@ -247,7 +271,7 @@ The user needs to see if the product is actually working.
 ## 7. Non-Functional Requirements
 
 - **Privacy:** Resume, email content, and credentials are sensitive. All PII encrypted at rest. Email content processed in-memory where possible; only metadata + classification result persisted.
-- **Auth:** OAuth for LinkedIn, Gmail. Job portal credentials stored encrypted (per-user key) — only used for autofill, never shared.
+- **Auth:** Google OAuth for user identity (login/signup). OAuth also used for LinkedIn and Gmail integrations. Job portal credentials stored encrypted (per-user key) — only used for autofill, never shared. See §6.17 for the full auth spec.
 - **Reliability:** Crawlers must handle rate limits and IP blocks gracefully. Per-source circuit breakers.
 - **Cost:** LLM calls are the dominant cost. Cache aggressively per (job_hash, profile_version). Track per-user monthly LLM spend; surface to the user.
 - **Compliance:** Respect robots.txt and ToS for each source. LinkedIn scraping is excluded from v1 sources.
@@ -303,6 +327,12 @@ Storage: Postgres for transactional data, object storage for resumes/screenshots
 ## 11. Phased Rollout
 
 3–4 month build at evening pace. Phases re-sequenced to put the highest-leverage features earlier.
+
+### Phase 0 — Auth (prerequisite, completed)
+
+- Google OAuth login/signup via NextAuth.js.
+- Session stored in JWT cookie; user UUID threaded to all backend services via `X-User-Id` header.
+- Middleware protects all routes; `/login` is the only public page.
 
 ### Phase 1 — MVP (target: 4 weeks)
 
@@ -391,4 +421,4 @@ Picked to lean on stack already operated daily, with additions for the AI/automa
 - **LLM:** Anthropic Claude API for drafting, classification, and tailoring. No provider abstraction in v1.
 - **Frontend:** Next.js + Tailwind + shadcn/ui.
 - **Infra:** Docker Compose for local, Kubernetes for hosted, GitHub Actions for CI.
-- **Auth:** OAuth 2.0 (Google, LinkedIn export), JWT for app sessions.
+- **Auth:** NextAuth.js v4 with Google OAuth provider. JWT sessions (HTTP-only cookie). Profile service owns the users table; NextAuth calls `/users/bootstrap` on sign-in to resolve the internal UUID.

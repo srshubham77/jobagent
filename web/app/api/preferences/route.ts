@@ -1,12 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth/next'
+import { authOptions } from '@/auth'
 
 const PROFILE_URL = process.env.PROFILE_SERVICE_URL ?? 'http://localhost:8081'
-const DEV_USER_ID = process.env.DEV_USER_ID ?? 'f4309bb2-433d-4465-bfba-5cd1472e49d7'
 
 export async function GET() {
+  const session = await getServerSession(authOptions)
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const userId = session.user.id
+
   try {
     const res = await fetch(`${PROFILE_URL}/preferences`, {
-      headers: { 'X-User-Id': DEV_USER_ID },
+      headers: { 'X-User-Id': userId },
       cache: 'no-store',
     })
     const data = await res.json()
@@ -17,11 +22,15 @@ export async function GET() {
 }
 
 export async function PUT(req: NextRequest) {
+  const session = await getServerSession(authOptions)
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const userId = session.user.id
+
   try {
     const body = await req.json()
     const res = await fetch(`${PROFILE_URL}/preferences`, {
       method: 'PUT',
-      headers: { 'X-User-Id': DEV_USER_ID, 'Content-Type': 'application/json' },
+      headers: { 'X-User-Id': userId, 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     })
     const data = await res.json()

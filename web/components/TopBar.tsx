@@ -1,5 +1,6 @@
 'use client'
 
+import { signOut } from 'next-auth/react'
 import { Avatar, KillSwitch } from './Atoms'
 
 const TITLES: Record<string, string> = {
@@ -23,6 +24,22 @@ export default function TopBar({ active, agentRunning, onToggleAgent, user }: {
       <div className="tb-right">
         <KillSwitch running={agentRunning} onToggle={onToggleAgent} />
         <Avatar>{user.avatarMonogram}</Avatar>
+        <button
+          onClick={() => signOut({ callbackUrl: '/login' })}
+          style={{
+            fontSize: 12,
+            color: 'var(--fg-muted)',
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            padding: '4px 8px',
+            borderRadius: 6,
+          }}
+          onMouseEnter={e => (e.currentTarget.style.color = 'var(--fg-1)')}
+          onMouseLeave={e => (e.currentTarget.style.color = 'var(--fg-muted)')}
+        >
+          Sign out
+        </button>
       </div>
     </header>
   )
