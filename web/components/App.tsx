@@ -10,11 +10,12 @@ import Kanban from './Kanban'
 import Analytics from './Analytics'
 import Settings from './Settings'
 import Onboarding from './Onboarding'
+import ReviewQueue from './ReviewQueue'
 import { DATA } from './data'
 import { api } from '../lib/api'
 import type { Job } from './types'
 
-type Screen = 'dashboard' | 'jobs' | 'pipeline' | 'analytics' | 'settings' | 'onboarding'
+type Screen = 'dashboard' | 'jobs' | 'review' | 'pipeline' | 'analytics' | 'settings' | 'onboarding'
 
 export default function App() {
   const [active, setActive] = useState<Screen>('dashboard')
@@ -47,6 +48,7 @@ export default function App() {
     switch (active) {
       case 'dashboard':  return <Dashboard data={DATA} agentRunning={agentRunning} />
       case 'jobs':       return <JobsFeed data={DATA} onOpen={setOpenJob} />
+      case 'review':     return <ReviewQueue />
       case 'pipeline':   return <Kanban data={DATA} />
       case 'analytics':  return <Analytics data={DATA} />
       case 'settings':   return <Settings data={DATA} agentRunning={agentRunning} onToggleAgent={handleToggleAgent} />

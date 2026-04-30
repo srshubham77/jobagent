@@ -1,0 +1,49 @@
+spring:
+  application:
+    name: tracker-service
+
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/jobagent}
+    username: ${DATABASE_USER:jobagent}
+    password: ${DATABASE_PASSWORD:jobagent}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+server:
+  port: 8085
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+
+anthropic:
+  api-key: ${ANTHROPIC_API_KEY}
+  base-url: https://api.anthropic.com
+  model: claude-haiku-4-5-20251001
+  max-tokens: 256
+  timeout-seconds: 30
+
+tracker:
+  gmail:
+    client-id: ${GMAIL_OAUTH_CLIENT_ID:}
+    client-secret: ${GMAIL_OAUTH_CLIENT_SECRET:}
+    redirect-uri: ${GMAIL_OAUTH_REDIRECT_URI:http://localhost:8085/tracker/callback}
+    poll-cron: "0 */5 * * * *"
+  ghosting:
+    days: 30
+    cron: "0 0 2 * * *"
+  # 32-byte AES key for encrypting OAuth tokens, base64-encoded
+  encryption-key: ${TOKEN_ENCRYPTION_KEY:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=}

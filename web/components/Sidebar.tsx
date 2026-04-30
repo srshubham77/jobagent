@@ -5,6 +5,7 @@ import { Icon, Wordmark } from './Atoms'
 const NAV = [
   { id: 'dashboard', label: 'Dashboard', icon: 'layout-dashboard' },
   { id: 'jobs',      label: 'Jobs feed', icon: 'briefcase' },
+  { id: 'review',    label: 'Review',    icon: 'clipboard-check' },
   { id: 'pipeline',  label: 'Pipeline',  icon: 'kanban' },
   { id: 'analytics', label: 'Analytics', icon: 'bar-chart-3' },
   { id: 'settings',  label: 'Settings',  icon: 'settings' },

@@ -42,6 +42,18 @@ class DraftOut(BaseModel):
     answers: list[AnswerOut]
 
 
+class DraftSummary(BaseModel):
+    """Lightweight view used by the approval queue list endpoint."""
+    id: uuid.UUID
+    job_id: uuid.UUID
+    status: str
+    cover_letter_preview: str | None  # first 200 chars
+    answer_count: int
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 class SubmitResult(BaseModel):
     application_id: uuid.UUID
     method: str          # "greenhouse_api" | "lever_api" | "playwright" | "manual"

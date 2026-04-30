@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from apply.api.deps import current_user_id, get_db
 from apply.db.models import Answer, Application, Job, Profile, Story
-from apply.schemas.apply import AnswerOut, AnswerPatch, DraftOut, DraftRequest
+from apply.schemas.apply import AnswerOut, AnswerPatch, DraftOut, DraftRequest, DraftSummary
 from apply.services.draft_generator import COMMON_QUESTIONS, DraftGenerator
 from apply.services.resume_tailor import ResumeTailor
 
@@ -15,6 +15,37 @@ router = APIRouter(prefix="/drafts", tags=["drafts"])
 
 _generator = DraftGenerator()
 _tailor = ResumeTailor()
+
+
+@router.get("", response_model=list[DraftSummary])
+async def list_drafts(
+    user_id: Annotated[uuid.UUID, Depends(current_user_id)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> list[DraftSummary]:
+    """Approval queue: all applications in 'drafted' status for the current user."""
+    result = await db.execute(
+        select(Application)
+        .where(Application.user_id == user_id, Application.status == "drafted")
+        .order_by(Application.created_at.desc())
+    )
+    applications = list(result.scalars())
+
+    summaries = []
+    for app in applications:
+        answer_result = await db.execute(
+            select(Answer).where(Answer.application_id == app.id)
+        )
+        answers = list(answer_result.scalars())
+        preview = app.cover_letter[:200] if app.cover_letter else None
+        summaries.append(DraftSummary(
+            id=app.id,
+            job_id=app.job_id,
+            status=app.status,
+            cover_letter_preview=preview,
+            answer_count=len(answers),
+            created_at=app.created_at,
+        ))
+    return summaries
 
 
 @router.post("", response_model=DraftOut, status_code=status.HTTP_201_CREATED)

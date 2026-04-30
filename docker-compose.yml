@@ -138,6 +138,31 @@ services:
       retries: 10
       start_period: 20s
 
+  tracker:
+    build:
+      context: services/tracker
+      dockerfile: Dockerfile
+    ports:
+      - "8085:8085"
+    environment:
+      DATABASE_URL: jdbc:postgresql://postgres:5432/jobagent
+      DATABASE_USER: jobagent
+      DATABASE_PASSWORD: jobagent
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      GMAIL_OAUTH_CLIENT_ID: ${GMAIL_OAUTH_CLIENT_ID:-}
+      GMAIL_OAUTH_CLIENT_SECRET: ${GMAIL_OAUTH_CLIENT_SECRET:-}
+      GMAIL_OAUTH_REDIRECT_URI: ${GMAIL_OAUTH_REDIRECT_URI:-http://localhost:8085/tracker/callback}
+      TOKEN_ENCRYPTION_KEY: ${TOKEN_ENCRYPTION_KEY:-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8085/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
   # ── Frontend ──────────────────────────────────────────────────────────────
 
   web:
@@ -150,6 +175,7 @@ services:
       PROFILE_SERVICE_URL: http://profile:8081
       MATCHER_SERVICE_URL: http://matcher:8083
       APPLY_SERVICE_URL: http://apply:8084
+      TRACKER_SERVICE_URL: http://tracker:8085
     depends_on:
       profile:
         condition: service_healthy
