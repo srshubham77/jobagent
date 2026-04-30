@@ -5,9 +5,10 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sqlalchemy import select
+
 from apply.api.deps import current_user_id, get_db
-from apply.config import settings
-from apply.db.models import Application, Job
+from apply.db.models import Application, Job, UserPreferences
 from apply.schemas.apply import SubmitResult
 from apply.services.submission.router import route_and_submit
 
@@ -20,8 +21,12 @@ async def submit_application(
     user_id: Annotated[uuid.UUID, Depends(current_user_id)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> SubmitResult:
-    # Kill switch check — hard rule from PRD §6.16
-    if not settings.agent_enabled:
+    # Kill switch check — read from DB so the UI toggle takes effect immediately
+    prefs_result = await db.execute(
+        select(UserPreferences).where(UserPreferences.user_id == user_id)
+    )
+    prefs = prefs_result.scalar_one_or_none()
+    if prefs is not None and not prefs.agent_enabled:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Agent is paused. Re-enable via the kill switch before submitting.",

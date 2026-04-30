@@ -40,8 +40,17 @@ discovery:
   remoteok:
     enabled: true
     api-url: https://remoteok.com/api
-    # cron: every 6 hours
     cron: "0 0 */6 * * *"
+    user-agent: "JobAgent/1.0 (contact: srshubham77@gmail.com)"
+  weworkremotely:
+    enabled: true
+    feed-url: https://weworkremotely.com/remote-jobs.rss
+    cron: "0 30 */6 * * *"
+    user-agent: "JobAgent/1.0 (contact: srshubham77@gmail.com)"
+  hn:
+    enabled: true
+    # Run once per day, mid-morning
+    cron: "0 0 10 * * *"
     user-agent: "JobAgent/1.0 (contact: srshubham77@gmail.com)"
   salary:
     llm-classify-ambiguous: true

@@ -10,6 +10,14 @@ class Base(DeclarativeBase):
     pass
 
 
+class UserPreferences(Base):
+    __tablename__ = "user_preferences"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    agent_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+
 class User(Base):
     __tablename__ = "users"
 

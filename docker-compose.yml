@@ -54,6 +54,110 @@ services:
       retries: 10
       start_period: 30s
 
+  # ── Backend Services ──────────────────────────────────────────────────────
+
+  profile:
+    build:
+      context: services/profile
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8081"
+    environment:
+      DATABASE_URL: jdbc:postgresql://postgres:5432/jobagent
+      DATABASE_USER: jobagent
+      DATABASE_PASSWORD: jobagent
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8081/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+  discovery:
+    build:
+      context: services/discovery
+      dockerfile: Dockerfile
+    ports:
+      - "8082:8082"
+    environment:
+      DATABASE_URL: jdbc:postgresql://postgres:5432/jobagent
+      DATABASE_USER: jobagent
+      DATABASE_PASSWORD: jobagent
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8082/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+  matcher:
+    build:
+      context: services/matcher
+      dockerfile: Dockerfile
+    ports:
+      - "8083:8083"
+    environment:
+      DATABASE_URL: jdbc:postgresql://postgres:5432/jobagent
+      DATABASE_USER: jobagent
+      DATABASE_PASSWORD: jobagent
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8083/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+  apply:
+    build:
+      context: services/apply
+      dockerfile: Dockerfile
+    ports:
+      - "8084:8084"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://jobagent:jobagent@postgres:5432/jobagent
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8084/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # ── Frontend ──────────────────────────────────────────────────────────────
+
+  web:
+    build:
+      context: web
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      PROFILE_SERVICE_URL: http://profile:8081
+      MATCHER_SERVICE_URL: http://matcher:8083
+      APPLY_SERVICE_URL: http://apply:8084
+    depends_on:
+      profile:
+        condition: service_healthy
+      matcher:
+        condition: service_healthy
+      apply:
+        condition: service_healthy
+
 volumes:
   postgres_data:
   redis_data:

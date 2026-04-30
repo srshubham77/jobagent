@@ -29,9 +29,28 @@ public class CrawlerOrchestrator {
     }
 
     @Scheduled(cron = "${discovery.remoteok.cron:0 0 */6 * * *}")
-    public void scheduledRun() {
-        log.info("Scheduled crawl starting, sources={}", crawlers.stream().map(Crawler::sourceName).toList());
-        runAll();
+    public void scheduledRemoteOk() {
+        runSource(RemoteOkCrawler.SOURCE);
+    }
+
+    @Scheduled(cron = "${discovery.weworkremotely.cron:0 30 */6 * * *}")
+    public void scheduledWwr() {
+        runSource(WeWorkRemotelyCrawler.SOURCE);
+    }
+
+    @Scheduled(cron = "${discovery.hn.cron:0 0 10 * * *}")
+    public void scheduledHn() {
+        runSource(HnHiringCrawler.SOURCE);
+    }
+
+    private void runSource(String sourceName) {
+        crawlers.stream()
+                .filter(c -> c.sourceName().equals(sourceName))
+                .findFirst()
+                .ifPresent(c -> {
+                    log.info("Scheduled crawl starting, source={}", sourceName);
+                    runOne(c);
+                });
     }
 
     /** Called from the REST endpoint for manual/dev triggers. */

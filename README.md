@@ -4,7 +4,7 @@
 
 **An AI agent that finds remote, USD-paying engineering jobs and applies on your behalf.**
 
-[![Status](https://img.shields.io/badge/status-Phase%201%20%E2%80%94%20WIP-orange)]()
+[![Status](https://img.shields.io/badge/status-Phase%201%20complete-brightgreen)]()
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Stack](https://img.shields.io/badge/stack-Java%20%7C%20Python%20%7C%20Next.js-informational)]()
 
@@ -71,84 +71,126 @@ A few things make this more than a thin wrapper around an LLM.
 
 **Email crawling for state transitions.** OAuth into Gmail, classify each new message (`ack` / `recruiter_contact` / `interview_scheduling` / `rejection` / `offer` / `irrelevant`), match to an Application via multi-signal scoring (sender domain → sender name → company mention → timestamp proximity), and update pipeline state without the user forwarding anything. Calendar invites are parsed as a special case.
 
-**Human-in-the-loop, always.** Nothing auto-submits without review in v1. A global kill switch in the top nav halts all automation. Default settings are conservative.
+**Human-in-the-loop, always.** Nothing auto-submits without review in v1. A global kill switch in the top nav halts all automation — the toggle writes directly to the database so it takes effect on the next submit, with no service restart required.
 
 ## Architecture
 
-JobAgent is a hybrid Java + Python microservices system communicating via Kafka, with a Next.js frontend.
+JobAgent is a hybrid Java + Python microservices system with a Next.js frontend.
 
 ![Architecture diagram](docs/architecture.svg)
 
 **Seven logical services:**
 
-- **Profile service** (Java/Spring Boot) — resume parsing, profile CRUD, versioning, story bank
-- **Discovery service** (Java/Spring Boot) — per-source crawlers, deduper, salary normalizer
-- **Matcher service** (Java/Spring Boot) — fit scoring against profile and filters
-- **Network service** (Java/Spring Boot) — LinkedIn connection lookup, referral path detection
-- **Apply service** (Python/FastAPI) — draft generation, resume tailoring, submission orchestration
-- **Tracker service** (Java/Spring Boot) — email ingestion, classification, state transitions
-- **Analytics service** (Java/Spring Boot) — funnel rollups, conversion stats, per-variant tracking
+| Service | Runtime | Responsibility |
+|---|---|---|
+| **Profile** | Java / Spring Boot | Resume parsing (Tika + Claude), profile versioning, story bank CRUD |
+| **Discovery** | Java / Spring Boot | RemoteOK, We Work Remotely, HN Who's Hiring crawlers; salary normalizer; circuit breaker |
+| **Matcher** | Java / Spring Boot | 4-dimension fit scoring: skill overlap, seniority, salary fit, recency |
+| **Apply** | Python / FastAPI | Cover letter + Q&A draft generation, resume tailoring, Playwright Tier 2 submission |
+| **Network** | Java / Spring Boot | LinkedIn connection lookup, referral path detection (Phase 3) |
+| **Tracker** | Java / Spring Boot | Gmail OAuth ingestion, email classification, state transitions (Phase 2) |
+| **Analytics** | Java / Spring Boot | Funnel rollups, per-variant reply rates (Phase 4) |
 
-**Storage:** Postgres for transactional data, pgvector for embeddings (fit scoring + learning loop), Redis for crawler dedup and per-domain rate limiting, S3-compatible object store for resumes and submission screenshots.
+**Storage:** Postgres + pgvector (transactional + embeddings), Redis (crawler dedup, rate limiting), S3-compatible object store (resumes, screenshots).
 
-**The Apply service is in Python** because Playwright and the LLM SDK are first-class there. Everything else is Java because that's the daily-driver stack and these services are largely orthogonal data plumbing — Spring Boot's ergonomics around Kafka, JPA, and Spring Security pay off.
+**The Apply service is in Python** because Playwright and the Anthropic SDK are first-class there. Everything else is Java.
 
 For full architecture detail, data model, and service responsibilities, see [docs/architecture.md](docs/architecture.md).
 
 ## Quick start
 
-> ⚠️ Phase 1 is in progress. Not all services are runnable yet. See [Roadmap](#roadmap) for what works today.
-
 ### Prerequisites
 
-- Java 21+
-- Python 3.11+
-- Node.js 20+
-- Docker and Docker Compose
-- An Anthropic API key for the LLM-powered services
+- Docker and Docker Compose (all services containerized)
+- An Anthropic API key
 
-### Setup
+### One-command setup
 
 ```bash
-# Clone the repo
 git clone https://github.com/srshubham77/jobagent.git
 cd jobagent
 
-# Copy and edit environment variables
+# Copy and fill in your API key
 cp .env.example .env
-# Set ANTHROPIC_API_KEY and other required values
+# edit .env — set ANTHROPIC_API_KEY at minimum
 
-# Bring up infrastructure (Postgres, Redis, Kafka)
+# Start everything: Postgres + all services + frontend
 docker compose up -d
 
-# Run database migrations
-./gradlew :profile-service:flywayMigrate
-
-# Start the backend services (in separate terminals or via the run-all script)
-./gradlew :profile-service:bootRun
-./gradlew :discovery-service:bootRun
-./gradlew :matcher-service:bootRun
-cd services/apply && uvicorn main:app --reload
-
-# Start the frontend
-cd web && npm install && npm run dev
+# Tail logs
+docker compose logs -f
 ```
 
-The app will be available at `http://localhost:3000`.
+The app is at **http://localhost:3000**. Flyway migrations run automatically on startup.
+
+### Bootstrap a user (Phase 1 — no auth yet)
+
+```bash
+# Create the dev user (or get its ID if already exists)
+curl -s -X POST http://localhost:8081/users/bootstrap \
+  -H "Content-Type: application/json" \
+  -d '{"email":"you@example.com"}' | jq .
+
+# Upload a resume
+curl -s -X POST http://localhost:8081/profiles/upload \
+  -H "X-User-Id: <userId-from-above>" \
+  -F "file=@/path/to/resume.pdf" | jq .
+```
+
+Then open the UI, go to **Settings → Automation**, and turn on the agent. The discovery crawlers run on their configured schedule (every 6 hours for RemoteOK and WWR, once daily for HN).
+
+### Manual trigger
+
+```bash
+# Trigger a crawl run immediately
+curl -X POST http://localhost:8082/crawl
+```
+
+### Development (without Docker)
+
+```bash
+# Infrastructure only (Postgres + Redis)
+docker compose up -d postgres redis
+
+# Profile service
+cd services/profile
+./gradlew bootRun
+
+# Discovery service
+cd services/discovery
+./gradlew bootRun
+
+# Matcher service
+cd services/matcher
+./gradlew bootRun
+
+# Apply service
+cd services/apply
+uv sync && uv run uvicorn apply.main:app --reload --port 8084
+
+# Frontend
+cd web
+npm install && npm run dev
+```
 
 ### Configuration
 
-All sensitive configuration lives in `.env`. See `.env.example` for the full list. Required for Phase 1:
+All configuration lives in `.env`. See `.env.example` for the full list.
 
-- `ANTHROPIC_API_KEY` — for draft generation, salary normalization, and email classification
-- `DATABASE_URL` — Postgres connection string
-- `REDIS_URL` — Redis connection string
-- `KAFKA_BOOTSTRAP_SERVERS` — Kafka broker addresses
+**Required for Phase 1:**
 
-Optional, enabled in later phases:
+| Variable | Purpose |
+|---|---|
+| `ANTHROPIC_API_KEY` | Draft generation, salary normalization |
+| `DATABASE_URL` | Postgres connection string |
+| `DATABASE_USER` / `DATABASE_PASSWORD` | DB credentials |
 
-- `GMAIL_OAUTH_CLIENT_ID` / `GMAIL_OAUTH_CLIENT_SECRET` — Tracker service (Phase 2)
-- `GREENHOUSE_API_KEY`, `LEVER_API_KEY` — Tier 1 auto-submit (Phase 2)
+**Optional — later phases:**
+
+| Variable | Purpose |
+|---|---|
+| `GMAIL_OAUTH_CLIENT_ID/SECRET` | Tracker service (Phase 2) |
+| `GREENHOUSE_API_KEY`, `LEVER_API_KEY` | Tier 1 auto-submit (Phase 2) |
 
 ## Documentation
 
@@ -160,42 +202,38 @@ Optional, enabled in later phases:
 
 ## Roadmap
 
-JobAgent ships in four phases. Detailed task tracking lives in the project's Notion workspace.
+### ✅ Phase 1 — MVP (complete)
 
-### Phase 1 — MVP (in progress)
-
-- Profile builder from resume upload + story bank guided interview
-- One discovery source: RemoteOK
-- Salary normalization pipeline
-- Fit scoring v1
-- Manual apply: agent drafts, user copies, submits manually
-- Three states: Discovered, Drafted, Applied (manual move)
+- Profile service: resume upload and parsing (Apache Tika + Claude), structured profile CRUD, version history, story bank with STAR format and themes
+- Discovery service: RemoteOK, We Work Remotely (RSS), and HN "Who's Hiring" (Algolia API) crawlers; per-source circuit breaker
+- Salary normalization pipeline: regex classification (`usd_explicit` / `usd_implied` / `unstated` / `non_usd`), Claude Haiku fallback for ambiguous cases
+- Matcher service: 4-dimension fit scoring (skill overlap 35%, seniority 25%, salary fit 25%, recency 15%); score stored with full breakdown
+- Apply service: cover letter + Q&A generation using story bank, resume tailoring (keywords only, no fabrication), Tier 1 (Greenhouse/Lever API), Tier 2 (Playwright), Tier 3 (manual)
+- Kill switch: `agent_enabled` toggle persisted in DB, checked on every submit call, wired to Settings UI
+- Frontend: Next.js 14 dashboard with kill switch connected to real API
+- Infrastructure: multi-stage Docker builds for all services, full Docker Compose stack
 
 **Success criteria:** drafted applications for 20 real jobs end-to-end without breaking; fit scores feel right after calibration.
 
-### Phase 2 — Tailoring + auto-apply + tracking
+### Phase 2 — Tracking + Tier 1 auto-submit
 
-- Per-application resume tailoring
-- Add We Work Remotely, Wellfound, Hacker News "Who's Hiring"
+- Email crawler with Gmail OAuth → `Active` and `Closed` state transitions
 - Tier 1 auto-submit via Greenhouse and Lever ATS APIs
-- Email crawler with Gmail OAuth → Active and Closed states
 - Duplicate application guard
-- Kill switch
+- Application approval queue with one-click approve/reject
 
 ### Phase 3 — Network + learning
 
 - LinkedIn manual export ingestion
-- Referral path detection
-- Learning loop with answer retrieval (pgvector)
+- Referral path detection and surfacing
+- Learning loop: embed user edits, retrieve at draft time (pgvector)
 - Recruiter contact enrichment
-- Tier 2 Playwright auto-submit with throttling and captcha fallback
 
 ### Phase 4 — Analytics + polish
 
-- Funnel view with breakdowns
-- Multi-resume variant analytics
-- Pipeline kanban view
-- Notifications (new high-fit jobs, recruiter replies)
+- Funnel view with breakdowns by source and resume variant
+- Notifications: new high-fit discoveries, recruiter replies
+- Pipeline kanban in sync with live application state
 
 ## Project structure
 
@@ -206,18 +244,17 @@ jobagent/
 │   ├── architecture.md
 │   ├── architecture.svg
 │   ├── design-briefs.md
-│   ├── decisions/              # ADRs
-│   └── screenshots/            # UI screenshots for the README
+│   └── decisions/              # ADRs
 ├── services/
 │   ├── profile/                # Java/Spring Boot — profile + story bank
 │   ├── discovery/              # Java/Spring Boot — crawlers + salary normalizer
 │   ├── matcher/                # Java/Spring Boot — fit scoring
 │   ├── network/                # Java/Spring Boot — LinkedIn + referrals
-│   ├── tracker/                # Java/Spring Boot — email ingestion
-│   ├── analytics/              # Java/Spring Boot — funnel rollups
+│   ├── tracker/                # Java/Spring Boot — email ingestion (Phase 2)
+│   ├── analytics/              # Java/Spring Boot — funnel rollups (Phase 4)
 │   └── apply/                  # Python/FastAPI — draft gen + Playwright
-├── web/                        # Next.js + Tailwind + shadcn/ui frontend
-├── infra/                      # Docker Compose, Kubernetes manifests, CI
+├── web/                        # Next.js 14 + Tailwind frontend
+├── docker-compose.yml          # Full stack: Postgres + all services + frontend
 ├── .env.example
 └── README.md
 ```
@@ -226,41 +263,40 @@ jobagent/
 
 | Layer | Choice | Why |
 |---|---|---|
-| Backend (data services) | Java 21, Spring Boot 3 | Daily-driver stack; mature Kafka/JPA/Security ergonomics |
+| Backend (data services) | Java 21, Spring Boot 3.3 | Daily-driver stack; mature Kafka/JPA/Security ergonomics |
 | Backend (apply service) | Python 3.11, FastAPI | Playwright and LLM SDKs are first-class in Python |
-| Async messaging | Kafka | Familiar; per-source isolation; replay friendly |
 | Storage (transactional) | Postgres + pgvector | Single store for relational data and embeddings |
 | Storage (cache, throttle) | Redis | Crawler dedup keys, per-domain rate limit tokens |
 | Storage (blobs) | S3-compatible | Resumes, generated variants, submission screenshots |
 | Browser automation | Playwright (Python) | Tier 2 submission for non-API ATSes |
 | LLM | Claude (Anthropic API) | Drafting, salary normalization, email classification |
-| Frontend | Next.js 14, Tailwind, shadcn/ui | Fast iteration; design system maps cleanly to components |
-| Auth | OAuth 2.0 (Google, LinkedIn export), JWT for sessions | Standard |
-| Local infra | Docker Compose | One-command bring-up of Postgres + Redis + Kafka |
-| Hosted infra | Kubernetes | Familiar; scales horizontally per service |
+| Frontend | Next.js 14, Tailwind | Fast iteration; design system maps cleanly to components |
+| Migrations | Flyway | SQL-first, version-controlled schema |
+| Resume parsing | Apache Tika 2.9 | Handles PDF and DOCX without format-specific code |
+| Local infra | Docker Compose | One-command bring-up of all services |
 | CI | GitHub Actions | Standard |
 
 ## Status and limitations
 
-**This is a portfolio project, built in evenings.** It is not a hosted product, has no waitlist, and is not accepting users. The roadmap above is a real plan I'm executing, not a marketing artifact.
+**This is a portfolio project.** It is not a hosted product, has no waitlist, and is not accepting users.
 
 **Known limitations and explicit non-goals:**
 
-- v1 is single-user. No multi-tenancy, team mode, or agency mode.
-- No mobile app. Mobile web is a stacked single-column fallback, not a designed experience.
-- LinkedIn discovery is excluded from v1 sources due to legal risk (hiQ v. LinkedIn). The network/referral feature uses manual LinkedIn data export, not scraping.
-- Nothing auto-submits without human review in v1. The kill switch always halts automation.
-- The product targets remote, USD-paying roles. INR-paying or India-only roles are out of scope.
+- Single-user in Phase 1. No multi-tenancy.
+- No mobile app. Mobile web is a stacked fallback, not a designed experience.
+- LinkedIn discovery excluded due to legal risk (hiQ v. LinkedIn). Referral feature uses manual export only.
+- Nothing auto-submits without human review in Phase 1. The kill switch always halts automation.
+- Targets remote, USD-paying roles. INR-only or India-only roles are out of scope.
 
 ## Contributing
 
-I'm not actively soliciting contributions while Phase 1 is in flight, but if you have ideas, found a bug, or want to discuss the design:
+I'm not actively soliciting contributions while Phase 2 is in flight, but if you have ideas, found a bug, or want to discuss the design:
 
 - Open a [GitHub issue](https://github.com/srshubham77/jobagent/issues) — bug reports, feature ideas, architecture questions all welcome
 - For larger discussions, start a [Discussion](https://github.com/srshubham77/jobagent/discussions)
 - PRs are welcome but please open an issue first to discuss scope
 
-If you want to fork and run your own instance: go for it. The license permits it. The codebase is set up for single-user deployment.
+If you want to fork and run your own instance: go for it. The license permits it.
 
 ## License
 
@@ -268,9 +304,8 @@ MIT — see [LICENSE](LICENSE).
 
 ## Acknowledgments
 
-- Architecture and product decisions documented in [docs/decisions/](docs/decisions/) — these capture the reasoning behind tradeoffs that aren't obvious from the code alone.
-- UI design built with [Claude Design](https://claude.ai/design); design tokens and screen briefs live in [docs/design-briefs.md](docs/design-briefs.md).
-- The PRD reflects feedback rounds that pushed the design from "tool that ships applications" to "tool that gets offers." That reframing — primary metric is offers received, not application volume — drove most of the feature priority decisions in Phase 1 and 2.
+- Architecture and product decisions documented in [docs/decisions/](docs/decisions/).
+- UI design built with [Claude Design](https://claude.ai/design); design tokens and screen briefs in [docs/design-briefs.md](docs/design-briefs.md).
 
 ---
 

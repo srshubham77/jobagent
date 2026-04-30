@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Sidebar from './Sidebar'
 import TopBar from './TopBar'
 import Dashboard from './Dashboard'
@@ -11,6 +11,7 @@ import Analytics from './Analytics'
 import Settings from './Settings'
 import Onboarding from './Onboarding'
 import { DATA } from './data'
+import { api } from '../lib/api'
 import type { Job } from './types'
 
 type Screen = 'dashboard' | 'jobs' | 'pipeline' | 'analytics' | 'settings' | 'onboarding'
@@ -19,6 +20,28 @@ export default function App() {
   const [active, setActive] = useState<Screen>('dashboard')
   const [agentRunning, setRunning] = useState(true)
   const [openJob, setOpenJob] = useState<Job | null>(null)
+  const [prefLoaded, setPrefLoaded] = useState(false)
+
+  // Load agent_enabled from real preferences API on mount
+  useEffect(() => {
+    api.getPreferences()
+      .then(prefs => {
+        setRunning(prefs.agentEnabled)
+        setPrefLoaded(true)
+      })
+      .catch(() => setPrefLoaded(true)) // fall back to default=true if service is down
+  }, [])
+
+  const handleToggleAgent = useCallback(async () => {
+    const next = !agentRunning
+    setRunning(next)
+    try {
+      await api.setPreferences({ agentEnabled: next })
+    } catch {
+      // Roll back optimistic update if the API call fails
+      setRunning(!next)
+    }
+  }, [agentRunning])
 
   const screen = (() => {
     switch (active) {
@@ -26,7 +49,7 @@ export default function App() {
       case 'jobs':       return <JobsFeed data={DATA} onOpen={setOpenJob} />
       case 'pipeline':   return <Kanban data={DATA} />
       case 'analytics':  return <Analytics data={DATA} />
-      case 'settings':   return <Settings data={DATA} agentRunning={agentRunning} onToggleAgent={() => setRunning(r => !r)} />
+      case 'settings':   return <Settings data={DATA} agentRunning={agentRunning} onToggleAgent={handleToggleAgent} />
       case 'onboarding': return <Onboarding onDone={() => setActive('dashboard')} />
       default:           return null
     }
@@ -42,7 +65,7 @@ export default function App() {
           <TopBar
             active={active}
             agentRunning={agentRunning}
-            onToggleAgent={() => setRunning(r => !r)}
+            onToggleAgent={handleToggleAgent}
             user={DATA.user}
           />
           {screen}
