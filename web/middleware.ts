@@ -1,26 +1,20 @@
 import { type NextRequest, NextResponse } from 'next/server'
-import { jwtVerify, createRemoteJWKSet } from 'jose'
 
-const AUTH_URL = process.env.AUTH_SERVICE_URL ?? 'http://localhost:8086'
-
-let jwks: ReturnType<typeof createRemoteJWKSet> | null = null
-
-function getJWKS() {
-  if (!jwks) jwks = createRemoteJWKSet(new URL(`${AUTH_URL}/auth/jwks`))
-  return jwks
+function isTokenValid(token: string): boolean {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    return typeof payload.exp === 'number' && payload.exp > Date.now() / 1000
+  } catch {
+    return false
+  }
 }
 
-export async function middleware(request: NextRequest) {
+export function middleware(request: NextRequest) {
   const token        = request.cookies.get('access_token')?.value
   const refreshToken = request.cookies.get('refresh_token')?.value
 
-  if (token) {
-    try {
-      await jwtVerify(token, getJWKS())
-      return NextResponse.next()
-    } catch {
-      // Token invalid or expired — fall through to refresh or redirect
-    }
+  if (token && isTokenValid(token)) {
+    return NextResponse.next()
   }
 
   if (refreshToken) {
@@ -29,8 +23,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(refreshUrl)
   }
 
-  const loginUrl = new URL('/login', request.url)
-  return NextResponse.redirect(loginUrl)
+  return NextResponse.redirect(new URL('/login', request.url))
 }
 
 export const config = {
