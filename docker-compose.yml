@@ -129,6 +129,7 @@ services:
       GMAIL_OAUTH_CLIENT_SECRET: ${GMAIL_OAUTH_CLIENT_SECRET:-}
       GMAIL_OAUTH_REDIRECT_URI: ${GMAIL_OAUTH_REDIRECT_URI:-http://localhost:8085/tracker/callback}
       TOKEN_ENCRYPTION_KEY: ${TOKEN_ENCRYPTION_KEY:-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=}
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:3000}
     depends_on:
       postgres:
         condition: service_healthy
@@ -149,6 +150,7 @@ services:
       - "3000:3000"
     environment:
       PROFILE_SERVICE_URL: http://profile:8081
+      DISCOVERY_SERVICE_URL: http://discovery:8082
       MATCHER_SERVICE_URL: http://matcher:8083
       APPLY_SERVICE_URL: http://apply:8084
       TRACKER_SERVICE_URL: http://tracker:8085

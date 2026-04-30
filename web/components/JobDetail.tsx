@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Button, FitScore, Icon, LogoChip, SalaryBadge, TierBadge } from './Atoms'
 import type { FeedJob } from '../lib/api'
+import { api } from '../lib/api'
 import { logoChar, logoBg, salaryLabel, salaryMode, locationLabel } from '../lib/format'
 
 const TIER_NOTE: Record<number, string> = {
@@ -70,31 +71,79 @@ const JDTab = ({ job }: { job: FeedJob }) => {
   )
 }
 
-const DraftTab = ({ job }: { job: FeedJob }) => (
-  <>
-    <div style={{ padding: '32px 24px', color: 'var(--fg-muted)', textAlign: 'center' }}>
-      <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>Draft not generated yet</div>
-      <div style={{ fontSize: 13, maxWidth: 400, margin: '0 auto' }}>
-        Approve this job to have the agent generate a tailored resume and application answers.
+type DraftState = 'idle' | 'loading' | 'done' | 'error'
+
+const DraftTab = ({ job, onGoToReview }: { job: FeedJob; onGoToReview: () => void }) => {
+  const [state, setState] = useState<DraftState>('idle')
+  const [errMsg, setErrMsg] = useState('')
+
+  const approve = async () => {
+    setState('loading')
+    try {
+      await api.createDraft(job.jobId)
+      setState('done')
+    } catch (e) {
+      setErrMsg(e instanceof Error ? e.message : 'Failed to create draft')
+      setState('error')
+    }
+  }
+
+  return (
+    <>
+      <div style={{ padding: '32px 24px', color: 'var(--fg-muted)', textAlign: 'center' }}>
+        {state === 'done' ? (
+          <>
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--green-700)', marginBottom: 8 }}>
+              Draft created successfully
+            </div>
+            <div style={{ fontSize: 13, maxWidth: 400, margin: '0 auto' }}>
+              Cover letter and answers are ready for review.
+            </div>
+          </>
+        ) : state === 'error' ? (
+          <>
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--red-700)', marginBottom: 8 }}>
+              Draft generation failed
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--fg-muted)', maxWidth: 400, margin: '0 auto' }}>{errMsg}</div>
+          </>
+        ) : (
+          <>
+            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>Draft not generated yet</div>
+            <div style={{ fontSize: 13, maxWidth: 400, margin: '0 auto' }}>
+              Approve this job to have the agent generate a tailored resume and application answers.
+            </div>
+          </>
+        )}
       </div>
-    </div>
-    <div className="draft-action-bar">
-      <div className="submit-note">
-        <Icon name="info" size={12} />
-        <span>{TIER_NOTE[job.tier] ?? 'Submission method not determined.'}</span>
+      <div className="draft-action-bar">
+        <div className="submit-note">
+          <Icon name="info" size={12} />
+          <span>{TIER_NOTE[job.tier] ?? 'Submission method not determined.'}</span>
+        </div>
+        <div className="submit-row">
+          {state === 'done' ? (
+            <Button variant="primary" size="lg" onClick={onGoToReview}>
+              <Icon name="check" size={14} /> View in review queue
+            </Button>
+          ) : (
+            <>
+              <Button variant="ghost" size="sm" style={{ color: 'var(--red-700)' }} disabled={state === 'loading'}>
+                <Icon name="x" size={12} /> Skip this job
+              </Button>
+              <span className="grow" />
+              <Button variant="primary" size="lg" onClick={approve} disabled={state === 'loading'}>
+                {state === 'loading'
+                  ? 'Generating draft…'
+                  : <><Icon name="check" size={14} /> Approve and draft</>}
+              </Button>
+            </>
+          )}
+        </div>
       </div>
-      <div className="submit-row">
-        <Button variant="ghost" size="sm" style={{ color: 'var(--red-700)' }}>
-          <Icon name="x" size={12} /> Skip this job
-        </Button>
-        <span className="grow" />
-        <Button variant="primary" size="lg">
-          <Icon name="check" size={14} /> Approve and draft
-        </Button>
-      </div>
-    </div>
-  </>
-)
+    </>
+  )
+}
 
 const NetworkTab = () => (
   <div className="net-pad">
@@ -121,9 +170,10 @@ const TABS = [
   { id: 'activity', label: 'Activity' },
 ]
 
-export default function JobDetailDrawer({ job, onClose }: {
+export default function JobDetailDrawer({ job, onClose, onGoToReview }: {
   job: FeedJob
   onClose: () => void
+  onGoToReview: () => void
 }) {
   const [tab, setTab] = useState('jd')
 
@@ -191,7 +241,7 @@ export default function JobDetailDrawer({ job, onClose }: {
         </div>
 
         {tab === 'jd'       && <JDTab job={job} />}
-        {tab === 'draft'    && <DraftTab job={job} />}
+        {tab === 'draft'    && <DraftTab job={job} onGoToReview={onGoToReview} />}
         {tab === 'network'  && <NetworkTab />}
         {tab === 'activity' && <ActivityTab />}
       </div>

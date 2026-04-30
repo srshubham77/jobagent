@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Button, Icon, Input, KillSwitch, Toggle } from './Atoms'
-import type { Preferences } from '../lib/api'
+import type { Preferences, Profile, Story, StoryInput } from '../lib/api'
+import { api } from '../lib/api'
 
 const SETTINGS_NAV = [
   { id: 'profile',    label: 'Profile' },
@@ -10,153 +11,421 @@ const SETTINGS_NAV = [
   { id: 'targets',    label: 'Target roles & filters' },
   { id: 'accounts',   label: 'Connected accounts' },
   { id: 'automation', label: 'Automation' },
-  { id: 'cost',       label: 'Cost & usage' },
-  { id: 'account',    label: 'Account' },
 ]
 
-const ProfileSection = () => (
-  <div className="settings-section">
-    <h2>Profile</h2>
-    <div className="sec-sub">The agent uses these fields to draft applications and assess fit. Keep them current.</div>
-    <section className="card mb-4">
-      <div className="set-row">
-        <div className="set-l"><div className="t">Full name</div><div className="d">Used on resumes and cover letters.</div></div>
-        <div><Input defaultValue="Shubham Patel" /></div>
-      </div>
-      <div className="set-row">
-        <div className="set-l"><div className="t">Email</div><div className="d">Where the agent sends summaries and reply notifications.</div></div>
-        <div><Input defaultValue="shubham@example.com" /></div>
-      </div>
-      <div className="set-row">
-        <div className="set-l"><div className="t">Headline</div><div className="d">One-line summary used as a fallback when a story isn't a fit.</div></div>
-        <div><Input defaultValue="Senior frontend engineer · TypeScript, React, design systems" /></div>
-      </div>
-      <div className="set-row">
-        <div className="set-l"><div className="t">Resume</div><div className="d">Base resume the agent tailors per role. Last upload Apr 18.</div></div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <Button variant="secondary" size="sm"><Icon name="download" size={12} /> Download current</Button>
-          <Button variant="primary" size="sm"><Icon name="upload" size={12} /> Upload new resume</Button>
+// ── Profile section ──────────────────────────────────────────────────────────
+
+const ProfileSection = ({ profile }: { profile: Profile | null }) => {
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [uploading, setUploading] = useState(false)
+  const [uploadMsg, setUploadMsg] = useState('')
+
+  const upload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    setUploadMsg('')
+    try {
+      await api.uploadResume(file)
+      setUploadMsg('Resume uploaded successfully. Refresh to see updated profile.')
+    } catch {
+      setUploadMsg('Upload failed. Check that the profile service is running.')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  return (
+    <div className="settings-section">
+      <h2>Profile</h2>
+      <div className="sec-sub">The agent uses these fields to draft applications and assess fit. Keep them current.</div>
+      <section className="card mb-4">
+        <div className="set-row">
+          <div className="set-l"><div className="t">Full name</div><div className="d">Used on resumes and cover letters.</div></div>
+          <div><Input defaultValue={profile?.contact?.name ?? ''} readOnly /></div>
         </div>
-      </div>
-    </section>
-
-    <section className="card">
-      <h3 style={{ fontSize: 14, fontWeight: 600, margin: '0 0 12px' }}>Profile version history</h3>
-      <div className="activity-list">
-        <div className="activity-item"><Icon name="file-text" size={14} /><span><b>v4</b> · added "growth + experimentation" focus</span><span className="when">Apr 18</span></div>
-        <div className="activity-item"><Icon name="file-text" size={14} /><span><b>v3</b> · expanded Spline bullets</span><span className="when">Apr 02</span></div>
-        <div className="activity-item"><Icon name="file-text" size={14} /><span><b>v2</b> · onboarding import</span><span className="when">Mar 28</span></div>
-      </div>
-    </section>
-  </div>
-)
-
-const StoryBankSection = () => (
-  <div className="settings-section">
-    <h2>Story bank</h2>
-    <div className="sec-sub">Reusable stories the agent draws from when answering application questions. Tag each story so the agent can match it to the right prompt.</div>
-
-    <div className="story-quality">
-      <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 13, fontWeight: 600 }}>Theme coverage</div>
-        <div style={{ fontSize: 11.5, color: 'var(--fg-muted)', marginTop: 2 }}>You're missing stories tagged <i>conflict</i> and <i>failure</i> — common interview themes.</div>
-      </div>
-      <div className="sq-bar"><span style={{ width: '64%' }} /></div>
-      <div className="sq-num">7 / 11 themes</div>
-    </div>
-
-    <section className="card">
-      <div className="row-between mb-3">
-        <span className="eyebrow">8 stories</span>
-        <Button variant="primary" size="sm"><Icon name="plus" size={12} /> Add story</Button>
-      </div>
-      {[
-        { t: 'Analytics migration',       tags: ['leadership', 'technical', 'scale'] },
-        { t: 'Asana rules engine launch', tags: ['leadership', 'shipping'] },
-        { t: 'Hiring loop redesign',      tags: ['process', 'collaboration'] },
-        { t: 'Performance regression saga', tags: ['debugging', 'persistence'] },
-        { t: 'Design system rollout',     tags: ['cross-functional', 'systems'] },
-      ].map((s, i) => (
-        <div key={i} className="story-row">
-          <div>
-            <div className="st-t">{s.t}</div>
-            <div className="st-tags">{s.tags.map(t => <span key={t} className="theme-tag">{t}</span>)}</div>
+        <div className="set-row">
+          <div className="set-l"><div className="t">Email</div><div className="d">Where the agent sends summaries.</div></div>
+          <div><Input defaultValue={profile?.contact?.email ?? ''} readOnly /></div>
+        </div>
+        {profile?.contact?.location && (
+          <div className="set-row">
+            <div className="set-l"><div className="t">Location</div></div>
+            <div><Input defaultValue={profile.contact.location} readOnly /></div>
           </div>
-          <Button variant="ghost" size="sm">Edit</Button>
+        )}
+        <div className="set-row">
+          <div className="set-l">
+            <div className="t">Resume</div>
+            <div className="d">Base resume the agent tailors per role.{profile?.versionNumber ? ` Version ${profile.versionNumber} on file.` : ''}</div>
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <Button variant="primary" size="sm" onClick={() => fileRef.current?.click()} disabled={uploading}>
+              <Icon name="upload" size={12} /> {uploading ? 'Uploading…' : 'Upload new resume'}
+            </Button>
+            <input ref={fileRef} type="file" accept=".pdf,.docx" style={{ display: 'none' }} onChange={upload} />
+            {uploadMsg && <span style={{ fontSize: 12, color: uploadMsg.includes('failed') ? 'var(--red-700)' : 'var(--green-700)' }}>{uploadMsg}</span>}
+          </div>
         </div>
-      ))}
-    </section>
-  </div>
-)
+      </section>
 
-const TargetsSection = () => {
-  const [usdOnly, setUsdOnly] = useState(true)
-  const [includeImplied, setII] = useState(false)
-  const [minSalary, setMin] = useState('180000')
-  const [stack, setStack] = useState('TypeScript, React, Node.js')
+      {profile?.skills && profile.skills.length > 0 && (
+        <section className="card">
+          <h3 style={{ fontSize: 14, fontWeight: 600, margin: '0 0 12px' }}>Skills ({profile.skills.length})</h3>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {profile.skills.slice(0, 30).map(s => (
+              <span key={s} className="skill-chip have" style={{ fontSize: 11 }}>{s}</span>
+            ))}
+          </div>
+        </section>
+      )}
+    </div>
+  )
+}
+
+// ── Story bank section ───────────────────────────────────────────────────────
+
+const BLANK_STORY: StoryInput = { title: '', situation: '', action: '', result: '', metrics: '', themes: [] }
+
+const StoryModal = ({ story, onSave, onClose }: {
+  story: Partial<StoryInput> & { id?: string }
+  onSave: (data: StoryInput, id?: string) => Promise<void>
+  onClose: () => void
+}) => {
+  const [form, setForm] = useState<StoryInput>({
+    title:     story.title     ?? '',
+    situation: story.situation ?? '',
+    action:    story.action    ?? '',
+    result:    story.result    ?? '',
+    metrics:   story.metrics   ?? '',
+    themes:    story.themes    ?? [],
+  })
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState('')
+
+  const set = (k: keyof StoryInput, v: string) => setForm(f => ({ ...f, [k]: v }))
+
+  const submit = async () => {
+    if (!form.title || !form.situation || !form.action || !form.result) {
+      setErr('Title, situation, action, and result are required.')
+      return
+    }
+    setSaving(true)
+    try {
+      const themes = (form.themes as unknown as string)
+        .toString().split(',').map(s => s.trim()).filter(Boolean)
+      await onSave({ ...form, themes }, story.id)
+      onClose()
+    } catch {
+      setErr('Save failed. Please try again.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const Field = ({ label, k, multiline }: { label: string; k: keyof StoryInput; multiline?: boolean }) => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--fg-muted)' }}>{label}</label>
+      {multiline ? (
+        <textarea
+          value={form[k] as string}
+          onChange={e => set(k, e.target.value)}
+          style={{ padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 6, resize: 'vertical', minHeight: 80, fontSize: 13, fontFamily: 'var(--font-sans)', background: 'var(--bg-1)', color: 'var(--fg-1)' }}
+        />
+      ) : (
+        <Input value={form[k] as string} onChange={e => set(k, e.target.value)} />
+      )}
+    </div>
+  )
+
+  return (
+    <div className="modal-scrim" onClick={onClose}>
+      <div className="modal" style={{ maxWidth: 560, width: '90vw' }} onClick={e => e.stopPropagation()}>
+        <h3 style={{ margin: '0 0 16px' }}>{story.id ? 'Edit story' : 'Add story'}</h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <Field label="Title" k="title" />
+          <Field label="Situation" k="situation" multiline />
+          <Field label="Action" k="action" multiline />
+          <Field label="Result" k="result" multiline />
+          <Field label="Metrics (optional)" k="metrics" />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--fg-muted)' }}>Themes (comma-separated)</label>
+            <Input
+              value={(form.themes as unknown as string[]).join(', ')}
+              onChange={e => set('themes', e.target.value as unknown as string)}
+              placeholder="leadership, technical, shipping"
+            />
+          </div>
+        </div>
+        {err && <div style={{ marginTop: 8, fontSize: 12, color: 'var(--red-700)' }}>{err}</div>}
+        <div className="modal-foot" style={{ marginTop: 16 }}>
+          <Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
+          <Button variant="primary" size="sm" onClick={submit} disabled={saving}>
+            {saving ? 'Saving…' : 'Save story'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const StoryBankSection = () => {
+  const [stories, setStories] = useState<Story[]>([])
+  const [loading, setLoading] = useState(true)
+  const [editing, setEditing] = useState<(Partial<StoryInput> & { id?: string }) | null>(null)
+
+  useEffect(() => {
+    api.getStories()
+      .then(setStories)
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [])
+
+  const save = async (data: StoryInput, id?: string) => {
+    if (id) {
+      const updated = await api.updateStory(id, data)
+      setStories(s => s.map(x => x.id === id ? updated : x))
+    } else {
+      const created = await api.createStory(data)
+      setStories(s => [created, ...s])
+    }
+  }
+
+  const del = async (id: string) => {
+    await api.deleteStory(id)
+    setStories(s => s.filter(x => x.id !== id))
+  }
+
+  return (
+    <div className="settings-section">
+      <h2>Story bank</h2>
+      <div className="sec-sub">Reusable STAR stories the agent draws from when answering application questions.</div>
+
+      {loading ? (
+        <div style={{ color: 'var(--fg-muted)', fontSize: 13 }}>Loading…</div>
+      ) : (
+        <section className="card">
+          <div className="row-between mb-3">
+            <span className="eyebrow">{stories.length} {stories.length === 1 ? 'story' : 'stories'}</span>
+            <Button variant="primary" size="sm" onClick={() => setEditing(BLANK_STORY)}>
+              <Icon name="plus" size={12} /> Add story
+            </Button>
+          </div>
+          {stories.length === 0 ? (
+            <div style={{ padding: '24px 0', textAlign: 'center', color: 'var(--fg-muted)', fontSize: 13 }}>
+              No stories yet. Add your first one to help the agent answer behavioral questions.
+            </div>
+          ) : (
+            stories.map(s => (
+              <div key={s.id} className="story-row">
+                <div>
+                  <div className="st-t">{s.title}</div>
+                  <div className="st-tags">
+                    {(s.themes ?? []).map(t => <span key={t} className="theme-tag">{t}</span>)}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <Button variant="ghost" size="sm" onClick={() => setEditing({ ...s, metrics: s.metrics ?? undefined })}>Edit</Button>
+                  <Button variant="ghost" size="sm" style={{ color: 'var(--red-700)' }} onClick={() => del(s.id)}>Delete</Button>
+                </div>
+              </div>
+            ))
+          )}
+        </section>
+      )}
+
+      {editing !== null && (
+        <StoryModal story={editing} onSave={save} onClose={() => setEditing(null)} />
+      )}
+    </div>
+  )
+}
+
+// ── Targets section ──────────────────────────────────────────────────────────
+
+const TargetsSection = ({ prefs, onSave }: { prefs: Preferences | null; onSave: (p: Partial<Preferences>) => Promise<void> }) => {
+  const [usdOnly,       setUsdOnly]    = useState(prefs?.usdOnly ?? true)
+  const [minSalary,     setMinSalary]  = useState(String(prefs?.minSalary ?? ''))
+  const [targetTitle,   setTitle]      = useState(prefs?.targetTitle ?? '')
+  const [stack,         setStack]      = useState((prefs?.targetStack ?? []).join(', '))
+  const [saving,        setSaving]     = useState(false)
+  const [saved,         setSaved]      = useState(false)
+
+  const save = async () => {
+    setSaving(true)
+    try {
+      await onSave({
+        usdOnly,
+        minSalary: minSalary ? Number(minSalary) : null,
+        targetTitle: targetTitle || null,
+        targetStack: stack ? stack.split(',').map(s => s.trim()).filter(Boolean) : [],
+      })
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <div className="settings-section">
       <h2>Target roles & filters</h2>
       <div className="sec-sub">Hard rules that decide whether a job enters your pipeline at all.</div>
       <section className="card">
         <div className="set-row">
-          <div className="set-l"><div className="t">USD-paying only</div><div className="d">Skip roles paid in other currencies, regardless of remote eligibility.</div></div>
+          <div className="set-l"><div className="t">USD-paying only</div><div className="d">Skip roles paid in other currencies.</div></div>
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}><Toggle on={usdOnly} onChange={setUsdOnly} /></div>
         </div>
         <div className="set-row">
-          <div className="set-l"><div className="t">Include USD-implied roles</div><div className="d">Apply when the salary is unstated but the company typically pays in USD.</div></div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}><Toggle on={includeImplied} onChange={setII} /></div>
+          <div className="set-l"><div className="t">Target title</div><div className="d">The agent prioritises roles matching this title.</div></div>
+          <div><Input value={targetTitle} onChange={e => setTitle(e.target.value)} placeholder="e.g. Software Engineer" /></div>
         </div>
         <div className="set-row">
-          <div className="set-l"><div className="t">Minimum salary</div><div className="d">The agent skips roles below this floor.</div></div>
-          <div><Input value={minSalary} onChange={e => setMin(e.target.value)} style={{ maxWidth: 180 }} /></div>
+          <div className="set-l"><div className="t">Minimum salary (USD)</div><div className="d">The agent skips roles below this floor.</div></div>
+          <div><Input value={minSalary} onChange={e => setMinSalary(e.target.value)} style={{ maxWidth: 180 }} placeholder="e.g. 80000" /></div>
         </div>
         <div className="set-row">
-          <div className="set-l"><div className="t">Stack preferences</div><div className="d">Comma-separated. Used for the fit score and match reasoning.</div></div>
-          <div><Input value={stack} onChange={e => setStack(e.target.value)} /></div>
+          <div className="set-l"><div className="t">Stack preferences</div><div className="d">Comma-separated. Used for fit scoring.</div></div>
+          <div><Input value={stack} onChange={e => setStack(e.target.value)} placeholder="TypeScript, Go, Postgres" /></div>
         </div>
-        <div className="set-row">
-          <div className="set-l"><div className="t">Seniority</div><div className="d">The agent only surfaces roles at or above your floor.</div></div>
-          <div><Input defaultValue="Senior, Staff" /></div>
-        </div>
-        <div className="set-row">
-          <div className="set-l"><div className="t">Hard exclusions</div><div className="d">Companies the agent will never apply to. One per line.</div></div>
-          <div><Input defaultValue="Meta, Oracle" /></div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8, gap: 8, alignItems: 'center' }}>
+          {saved && <span style={{ fontSize: 12, color: 'var(--green-700)' }}>Saved</span>}
+          <Button variant="primary" size="sm" onClick={save} disabled={saving}>
+            {saving ? 'Saving…' : 'Save changes'}
+          </Button>
         </div>
       </section>
     </div>
   )
 }
 
-const AccountsSection = () => (
-  <div className="settings-section">
-    <h2>Connected accounts</h2>
-    <div className="sec-sub">The agent only reads what it needs. You can disconnect at any time.</div>
-    <section className="card">
-      <div className="acct-row">
-        <span className="logo-chip" style={{ background: '#D9663E' }}>G</span>
-        <div>
-          <div className="acct-t">Gmail</div>
-          <div className="acct-d">Reads recruiter replies to update pipeline state. Never sends mail or accesses personal threads. Last sync 4 minutes ago.</div>
-          <div style={{ marginTop: 4 }}><span className="acct-status"><span className="dot" /> Connected</span></div>
-        </div>
-        <Button variant="secondary" size="sm">Disconnect</Button>
-      </div>
-      <div className="acct-row">
-        <span className="logo-chip" style={{ background: '#0A66C2' }}>in</span>
-        <div>
-          <div className="acct-t">LinkedIn export</div>
-          <div className="acct-d">Static export used to find connections at target companies. Read-only. Last upload Apr 12 (14 days ago).</div>
-        </div>
-        <Button variant="secondary" size="sm"><Icon name="upload" size={12} /> Upload new export</Button>
-      </div>
-    </section>
-  </div>
-)
+// ── Connected accounts section ───────────────────────────────────────────────
 
-const AutomationSection = ({ agentRunning, onToggleAgent }: { agentRunning: boolean; onToggleAgent: () => void }) => {
-  const [autoApply, setAutoApply] = useState(false)
-  const [emailSummary, setES] = useState(true)
+const AccountsSection = () => {
+  const [status, setStatus] = useState<{ connected: boolean; lastEventAt: string | null; totalEvents: number } | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [disconnecting, setDisconnecting] = useState(false)
+  const [syncing, setSyncing] = useState(false)
+  const [syncMsg, setSyncMsg] = useState('')
+
+  useEffect(() => {
+    api.getTrackerStatus()
+      .then(setStatus)
+      .catch(() => setStatus({ connected: false, lastEventAt: null, totalEvents: 0 }))
+      .finally(() => setLoading(false))
+  }, [])
+
+  const disconnect = async () => {
+    setDisconnecting(true)
+    try {
+      await api.disconnectGmail()
+      setStatus(s => s ? { ...s, connected: false } : s)
+    } finally {
+      setDisconnecting(false)
+    }
+  }
+
+  const sync = async () => {
+    setSyncing(true)
+    setSyncMsg('')
+    try {
+      const result = await api.syncGmail()
+      setSyncMsg(`Synced — ${result.processed} email${result.processed !== 1 ? 's' : ''} processed.`)
+    } catch {
+      setSyncMsg('Sync failed.')
+    } finally {
+      setSyncing(false)
+    }
+  }
+
+  const lastSync = status?.lastEventAt
+    ? new Date(status.lastEventAt).toLocaleString()
+    : 'Never'
+
+  return (
+    <div className="settings-section">
+      <h2>Connected accounts</h2>
+      <div className="sec-sub">The agent only reads what it needs. You can disconnect at any time.</div>
+      <section className="card">
+        <div className="acct-row">
+          <span className="logo-chip" style={{ background: '#D9663E' }}>G</span>
+          <div style={{ flex: 1 }}>
+            <div className="acct-t">Gmail</div>
+            <div className="acct-d">
+              Reads recruiter replies to update pipeline state. Never sends mail.
+              {status?.connected && <> Last event: {lastSync}. {status.totalEvents} events total.</>}
+            </div>
+            {!loading && (
+              <div style={{ marginTop: 4 }}>
+                {status?.connected
+                  ? <span className="acct-status"><span className="dot" /> Connected</span>
+                  : <span className="acct-status" style={{ color: 'var(--fg-muted)' }}>Not connected</span>}
+              </div>
+            )}
+            {syncMsg && <div style={{ marginTop: 4, fontSize: 12, color: 'var(--fg-muted)' }}>{syncMsg}</div>}
+          </div>
+          {loading ? (
+            <span style={{ fontSize: 12, color: 'var(--fg-muted)' }}>…</span>
+          ) : status?.connected ? (
+            <div style={{ display: 'flex', gap: 6 }}>
+              <Button variant="secondary" size="sm" onClick={sync} disabled={syncing}>
+                {syncing ? 'Syncing…' : 'Sync now'}
+              </Button>
+              <Button variant="secondary" size="sm" onClick={disconnect} disabled={disconnecting}>
+                {disconnecting ? 'Disconnecting…' : 'Disconnect'}
+              </Button>
+            </div>
+          ) : (
+            <Button variant="primary" size="sm" onClick={() => { window.location.href = '/api/tracker/auth' }}>
+              Connect Gmail
+            </Button>
+          )}
+        </div>
+        <div className="acct-row">
+          <span className="logo-chip" style={{ background: '#0A66C2' }}>in</span>
+          <div style={{ flex: 1 }}>
+            <div className="acct-t">LinkedIn export</div>
+            <div className="acct-d">Static export used to find connections at target companies. Phase 3.</div>
+          </div>
+          <Button variant="secondary" size="sm" disabled>
+            <Icon name="upload" size={12} /> Coming in Phase 3
+          </Button>
+        </div>
+      </section>
+    </div>
+  )
+}
+
+// ── Automation section ───────────────────────────────────────────────────────
+
+const AutomationSection = ({ agentRunning, onToggleAgent, prefs, onSave }: {
+  agentRunning: boolean
+  onToggleAgent: () => void
+  prefs: Preferences | null
+  onSave: (p: Partial<Preferences>) => Promise<void>
+}) => {
+  const [autoApply,    setAutoApply]  = useState((prefs?.autoApplyThreshold ?? 0) > 0)
+  const [crawling,     setCrawling]   = useState(false)
+  const [crawlMsg,     setCrawlMsg]   = useState('')
+
+  const triggerCrawl = async () => {
+    setCrawling(true)
+    setCrawlMsg('')
+    try {
+      await api.triggerCrawl()
+      setCrawlMsg('Crawl triggered. New jobs will appear in the feed shortly.')
+    } catch {
+      setCrawlMsg('Crawl trigger failed — check that the discovery service is running.')
+    } finally {
+      setCrawling(false)
+    }
+  }
+
+  const saveAutoApply = async (v: boolean) => {
+    setAutoApply(v)
+    await onSave({ autoApplyThreshold: v ? 80 : 0 }).catch(() => {})
+  }
+
   return (
     <div className="settings-section">
       <h2>Automation</h2>
@@ -184,141 +453,49 @@ const AutomationSection = ({ agentRunning, onToggleAgent }: { agentRunning: bool
             <div className="t">Submit applications without approval</div>
             <div className="d">When on, the agent submits automatically when fit ≥ 80 and all hard rules pass. When off, every application requires your approval (recommended).</div>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}><Toggle on={autoApply} onChange={setAutoApply} /></div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}><Toggle on={autoApply} onChange={saveAutoApply} /></div>
         </div>
-        <div className="set-row">
-          <div className="set-l"><div className="t">Daily email summary</div><div className="d">A single email at 9pm with what the agent did and what's next.</div></div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}><Toggle on={emailSummary} onChange={setES} /></div>
-        </div>
-      </section>
-
-      <section className="card mb-4">
-        <h3 style={{ fontSize: 14, fontWeight: 600, margin: '0 0 4px' }}>Per-source toggles</h3>
-        <div className="sec-sub" style={{ marginBottom: 8 }}>Disable sources that are wasting the agent's time.</div>
-        {[
-          { name: 'RemoteOK',          on: false, last: '12 minutes ago', d: 'Reply rate 0.5% — recommended off.' },
-          { name: 'We Work Remotely',  on: true,  last: '6 minutes ago',  d: 'Reply rate 8.2% — strong source.' },
-          { name: 'Wellfound',         on: true,  last: '4 minutes ago',  d: 'Reply rate 6.4%.' },
-          { name: 'Greenhouse direct', on: true,  last: '8 minutes ago',  d: 'Crawls company boards directly.' },
-        ].map(s => (
-          <div key={s.name} className="src-row">
-            <div>
-              <div className="src-t">{s.name}</div>
-              <div className="src-d">{s.d}</div>
-            </div>
-            <div className="src-last">crawled {s.last}</div>
-            <Toggle on={s.on} />
-          </div>
-        ))}
       </section>
 
       <section className="card">
-        <h3 style={{ fontSize: 14, fontWeight: 600, margin: '0 0 4px' }}>Per-domain throttle</h3>
-        <div className="set-row">
-          <div className="set-l"><div className="t">Max applications per company per week</div><div className="d">Prevents the agent from over-applying to the same company.</div></div>
-          <div><Input defaultValue="2" style={{ maxWidth: 100 }} /></div>
-        </div>
-        <div className="set-row">
-          <div className="set-l"><div className="t">Max applications per day</div><div className="d">Hard cap on daily submissions.</div></div>
-          <div><Input defaultValue="15" style={{ maxWidth: 100 }} /></div>
+        <h3 style={{ fontSize: 14, fontWeight: 600, margin: '0 0 4px' }}>Manual trigger</h3>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+          <div style={{ fontSize: 13, color: 'var(--fg-muted)' }}>
+            Run the discovery crawlers now instead of waiting for the next scheduled run.
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            {crawlMsg && <span style={{ fontSize: 12, color: crawlMsg.includes('failed') ? 'var(--red-700)' : 'var(--fg-muted)' }}>{crawlMsg}</span>}
+            <Button variant="secondary" size="sm" onClick={triggerCrawl} disabled={crawling}>
+              {crawling ? 'Running…' : 'Trigger crawl'}
+            </Button>
+          </div>
         </div>
       </section>
     </div>
   )
 }
 
-const CostSection = () => (
-  <div className="settings-section">
-    <h2>Cost & usage</h2>
-    <div className="sec-sub">LLM spend across drafting, classification, and tailoring.</div>
+// ── Main component ───────────────────────────────────────────────────────────
 
-    <section className="card mb-4">
-      <div className="row-between mb-4">
-        <div>
-          <div className="eyebrow">This month</div>
-          <div style={{ fontSize: 32, fontWeight: 600, letterSpacing: '-0.025em', marginTop: 8, fontVariantNumeric: 'tabular-nums' }}>
-            $23.40 <span style={{ fontSize: 14, color: 'var(--fg-muted)', fontWeight: 500 }}>of $50.00</span>
-          </div>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
-          <span className="eyebrow">Monthly budget</span>
-          <Input defaultValue="50" style={{ maxWidth: 100, textAlign: 'right' }} />
-        </div>
-      </div>
-      <div style={{ height: 8, background: 'var(--bg-2)', borderRadius: 9999, overflow: 'hidden', marginBottom: 18 }}>
-        <span style={{ display: 'block', height: '100%', width: '47%', background: 'var(--accent)' }} />
-      </div>
-      <h3 style={{ fontSize: 13, fontWeight: 600, margin: '0 0 10px' }}>Breakdown by service</h3>
-      <div className="cost-breakdown">
-        {[
-          { l: 'Drafting',       v: 12.80, w: 55 },
-          { l: 'Classification', v:  6.20, w: 27 },
-          { l: 'Tailoring',      v:  3.40, w: 15 },
-          { l: 'Other',          v:  1.00, w:  3 },
-        ].map(r => (
-          <div key={r.l} className="cb-row">
-            <div className="cb-l">{r.l}</div>
-            <div className="cb-track"><span className="cb-fill" style={{ width: `${r.w}%` }} /></div>
-            <div className="cb-v">${r.v.toFixed(2)}</div>
-          </div>
-        ))}
-      </div>
-    </section>
-
-    <section className="card">
-      <h3 style={{ fontSize: 13, fontWeight: 600, margin: '0 0 4px' }}>Last 6 months</h3>
-      <div className="sec-sub" style={{ marginBottom: 0 }}>Monthly spend trend.</div>
-      <div className="cost-history">
-        {[18, 22, 31, 28, 19, 23.40].map((v, i) => (
-          <span key={i} className="ch-bar" style={{ height: `${(v / 35) * 100}%` }} />
-        ))}
-      </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--fg-muted)' }}>
-        {['Nov', 'Dec', 'Jan', 'Feb', 'Mar', 'Apr'].map(m => <span key={m}>{m}</span>)}
-      </div>
-    </section>
-  </div>
-)
-
-const AccountSection = () => (
-  <div className="settings-section">
-    <h2>Account</h2>
-    <div className="sec-sub">Login, password, and account deletion.</div>
-    <section className="card">
-      <div className="set-row">
-        <div className="set-l"><div className="t">Email</div><div className="d">Used to sign in and receive notifications.</div></div>
-        <div><Input defaultValue="shubham@example.com" /></div>
-      </div>
-      <div className="set-row">
-        <div className="set-l"><div className="t">Password</div><div className="d">Last changed 47 days ago.</div></div>
-        <div><Button variant="secondary" size="sm">Change password</Button></div>
-      </div>
-      <div className="set-row">
-        <div className="set-l"><div className="t">Sign out</div><div className="d">Sign out of this browser. The agent keeps running.</div></div>
-        <div><Button variant="secondary" size="sm">Sign out</Button></div>
-      </div>
-      <div className="set-row">
-        <div className="set-l"><div className="t" style={{ color: 'var(--red-700)' }}>Delete account</div><div className="d">Stops the agent and deletes your profile, stories, and history. Irreversible.</div></div>
-        <div><Button variant="danger" size="sm">Delete account</Button></div>
-      </div>
-    </section>
-  </div>
-)
-
-export default function Settings({ prefs: _prefs, agentRunning, onToggleAgent }: {
-  prefs: Preferences | null; agentRunning: boolean; onToggleAgent: () => void
+export default function Settings({ prefs, profile, agentRunning, onToggleAgent }: {
+  prefs: Preferences | null
+  profile: Profile | null
+  agentRunning: boolean
+  onToggleAgent: () => void
 }) {
   const [section, setSection] = useState('automation')
 
+  const savePrefs = async (patch: Partial<Preferences>) => {
+    await api.setPreferences(patch)
+  }
+
   const renderSection = () => {
     switch (section) {
-      case 'profile':    return <ProfileSection />
+      case 'profile':    return <ProfileSection profile={profile} />
       case 'stories':    return <StoryBankSection />
-      case 'targets':    return <TargetsSection />
+      case 'targets':    return <TargetsSection prefs={prefs} onSave={savePrefs} />
       case 'accounts':   return <AccountsSection />
-      case 'automation': return <AutomationSection agentRunning={agentRunning} onToggleAgent={onToggleAgent} />
-      case 'cost':       return <CostSection />
-      case 'account':    return <AccountSection />
+      case 'automation': return <AutomationSection agentRunning={agentRunning} onToggleAgent={onToggleAgent} prefs={prefs} onSave={savePrefs} />
       default:           return null
     }
   }

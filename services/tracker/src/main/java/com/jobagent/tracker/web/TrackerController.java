@@ -1,5 +1,6 @@
 package com.jobagent.tracker.web;
 
+import com.jobagent.tracker.config.TrackerProperties;
 import com.jobagent.tracker.domain.EmailEvent;
 import com.jobagent.tracker.gmail.GmailOAuthService;
 import com.jobagent.tracker.gmail.GmailPoller;
@@ -28,13 +29,16 @@ public class TrackerController {
     private final GmailOAuthService oauthService;
     private final GmailPoller poller;
     private final EmailEventRepository eventRepo;
+    private final TrackerProperties props;
 
     public TrackerController(GmailOAuthService oauthService,
                              GmailPoller poller,
-                             EmailEventRepository eventRepo) {
+                             EmailEventRepository eventRepo,
+                             TrackerProperties props) {
         this.oauthService = oauthService;
         this.poller = poller;
         this.eventRepo = eventRepo;
+        this.props = props;
     }
 
     /** Redirect the browser to Google's OAuth consent page. */
@@ -59,7 +63,9 @@ public class TrackerController {
 
         try {
             oauthService.handleCallback(code, userId);
-            return ResponseEntity.ok(Map.of("status", "connected", "userId", userId.toString()));
+            // Redirect back to the web app so the user lands on settings, not raw JSON
+            String returnUrl = props.appBaseUrl() + "/?gmail=connected";
+            return ResponseEntity.status(HttpStatus.FOUND).location(URI.create(returnUrl)).build();
         } catch (IOException e) {
             log.error("OAuth callback failed for userId={}: {}", userId, e.getMessage());
             return ResponseEntity.internalServerError()

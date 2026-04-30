@@ -6,7 +6,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public record TrackerProperties(
         GmailProperties gmail,
         GhostingProperties ghosting,
-        String encryptionKey
+        String encryptionKey,
+        String appBaseUrl
 ) {
     public record GmailProperties(
             String clientId,

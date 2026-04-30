@@ -63,9 +63,9 @@ export default function App() {
       case 'dashboard':  return <Dashboard jobs={jobs} agentRunning={agentRunning} userName={user.name} loading={loading} />
       case 'jobs':       return <JobsFeed jobs={jobs} loading={loading} onOpen={setOpenJob} />
       case 'review':     return <ReviewQueue />
-      case 'pipeline':   return <Kanban />
+      case 'pipeline':   return <Kanban jobs={jobs} />
       case 'analytics':  return <Analytics />
-      case 'settings':   return <Settings prefs={prefs} agentRunning={agentRunning} onToggleAgent={handleToggleAgent} />
+      case 'settings':   return <Settings prefs={prefs} profile={profile} agentRunning={agentRunning} onToggleAgent={handleToggleAgent} />
       case 'onboarding': return <Onboarding onDone={() => setActive('dashboard')} />
       default:           return null
     }
@@ -90,6 +90,7 @@ export default function App() {
         <JobDetailDrawer
           job={openJob}
           onClose={() => setOpenJob(null)}
+          onGoToReview={() => { setOpenJob(null); setActive('review') }}
         />
       )}
     </div>

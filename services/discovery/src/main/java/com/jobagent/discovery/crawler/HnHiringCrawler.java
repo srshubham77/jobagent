@@ -43,16 +43,19 @@ public class HnHiringCrawler implements Crawler {
     private final DiscoveryProperties props;
     private final JobRepository jobRepository;
     private final SalaryNormalizer salaryNormalizer;
+    private final TitleFilter titleFilter;
     private final ObjectMapper mapper;
     private final OkHttpClient http;
 
     public HnHiringCrawler(DiscoveryProperties props,
                            JobRepository jobRepository,
                            SalaryNormalizer salaryNormalizer,
+                           TitleFilter titleFilter,
                            ObjectMapper mapper) {
         this.props = props;
         this.jobRepository = jobRepository;
         this.salaryNormalizer = salaryNormalizer;
+        this.titleFilter = titleFilter;
         this.mapper = mapper;
         this.http = new OkHttpClient.Builder()
                 .connectTimeout(10, TimeUnit.SECONDS)
@@ -102,7 +105,7 @@ public class HnHiringCrawler implements Crawler {
                 continue;
             }
             Job job = toJob(c, externalId);
-            if (job != null) {
+            if (job != null && titleFilter.isEngineeringRole(job.getTitle())) {
                 jobRepository.save(job);
                 saved++;
             } else {

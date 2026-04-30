@@ -60,3 +60,29 @@ class SubmitResult(BaseModel):
     status: str          # "submitted" | "manual_required" | "failed"
     message: str | None
     screenshot_b64: str | None = None
+
+
+class ApplicationListItem(BaseModel):
+    id: uuid.UUID
+    job_id: uuid.UUID
+    job_title: str
+    job_company: str
+    job_location: str | None
+    job_apply_url: str | None
+    job_salary_mode: str
+    job_salary_min_usd: int | None
+    job_salary_max_usd: int | None
+    job_salary_raw: str | None
+    job_tier: int
+    job_posted_at: datetime | None
+    status: str
+    closed_tag: str | None
+    submitted_at: datetime | None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class StatusPatch(BaseModel):
+    status: str
+    closed_tag: str | None = None

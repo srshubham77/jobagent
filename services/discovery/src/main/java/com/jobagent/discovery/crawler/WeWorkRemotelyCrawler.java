@@ -37,14 +37,17 @@ public class WeWorkRemotelyCrawler implements Crawler {
     private final DiscoveryProperties props;
     private final JobRepository jobRepository;
     private final SalaryNormalizer salaryNormalizer;
+    private final TitleFilter titleFilter;
     private final OkHttpClient http;
 
     public WeWorkRemotelyCrawler(DiscoveryProperties props,
                                  JobRepository jobRepository,
-                                 SalaryNormalizer salaryNormalizer) {
+                                 SalaryNormalizer salaryNormalizer,
+                                 TitleFilter titleFilter) {
         this.props = props;
         this.jobRepository = jobRepository;
         this.salaryNormalizer = salaryNormalizer;
+        this.titleFilter = titleFilter;
         this.http = new OkHttpClient.Builder()
                 .connectTimeout(10, TimeUnit.SECONDS)
                 .readTimeout(30, TimeUnit.SECONDS)
@@ -75,6 +78,10 @@ public class WeWorkRemotelyCrawler implements Crawler {
 
         for (int i = 0; i < limit; i++) {
             WwrItem item = items.get(i);
+            if (!titleFilter.isEngineeringRole(item.title())) {
+                skipped++;
+                continue;
+            }
             if (jobRepository.existsBySourceAndExternalId(SOURCE, item.externalId())) {
                 skipped++;
                 continue;

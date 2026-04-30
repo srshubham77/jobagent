@@ -33,6 +33,7 @@ public class RemoteOkCrawler implements Crawler {
     private final JobRepository jobRepository;
     private final SalaryNormalizer salaryNormalizer;
     private final SalaryClassifier salaryClassifier;
+    private final TitleFilter titleFilter;
     private final ObjectMapper mapper;
     private final OkHttpClient http;
 
@@ -40,11 +41,13 @@ public class RemoteOkCrawler implements Crawler {
                            JobRepository jobRepository,
                            SalaryNormalizer salaryNormalizer,
                            SalaryClassifier salaryClassifier,
+                           TitleFilter titleFilter,
                            ObjectMapper mapper) {
         this.props = props;
         this.jobRepository = jobRepository;
         this.salaryNormalizer = salaryNormalizer;
         this.salaryClassifier = salaryClassifier;
+        this.titleFilter = titleFilter;
         this.mapper = mapper;
         this.http = new OkHttpClient.Builder()
                 .connectTimeout(10, TimeUnit.SECONDS)
@@ -77,6 +80,10 @@ public class RemoteOkCrawler implements Crawler {
         for (int i = 0; i < limit; i++) {
             RemoteOkJob raw = jobs.get(i);
             if (raw.id() == null || raw.title() == null || raw.company() == null) {
+                skipped++;
+                continue;
+            }
+            if (!titleFilter.isEngineeringRole(raw.title())) {
                 skipped++;
                 continue;
             }

@@ -3,6 +3,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from apply.api.applications import router as applications_router
 from apply.api.drafts import router as drafts_router
 from apply.api.submit import router as submit_router
 
@@ -17,6 +18,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(applications_router)
 app.include_router(drafts_router)
 app.include_router(submit_router)
 
